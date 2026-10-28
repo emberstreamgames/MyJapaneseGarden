@@ -11,7 +11,7 @@ A Japanese study app built around the Genki I textbook. There's flashcard practi
 - Svelte 5 (runes: `$state`, `$derived`, `$effect`, `$props`), TypeScript, Vite. No router, no UI library, no test framework yet.
 - `npm run dev`: dev server on port 5173. The browser console shows content warnings from `items.ts`.
 - `npm run check`: svelte-check plus tsc. Run it after changes; it should report 0 errors and 0 warnings.
-- `npm run build`: production build into `dist/`.
+- `npm run build`: production build into `dist/`, with base `/GenkiGrow/` for GitHub Pages (`BASE_PATH=/` overrides it). `npm run preview` serves it at `localhost:4173/GenkiGrow/`.
 - `Launchers/Windows/*.bat` and `Launchers/Mac/*.command` start and stop the dev server by double-click. The start scripts install dependencies on first run, print the LAN URL for phones, and open the browser. There's no Linux equivalent yet.
 
 ## Layout
@@ -34,6 +34,8 @@ A Japanese study app built around the Genki I textbook. There's flashcard practi
 | `WeedSprite.svelte`, `WeedPluck.svelte` | Weed art (3 kinds) and the pluck animation. Weeds sit on `WEED_SPOTS` in `meadow.ts`: lawn points clear of every plot's plant |
 | `Ants.svelte` | Ambient ants walking `ANT_LANES` (`meadow.ts`) while the garden is open; one may carry a coin. Its SVG layer matches the scene's box, bleed included |
 | `src/lib/sfx.ts` | Sounds generated with the Web Audio API (no audio files) |
+| `public/manifest.webmanifest`, `public/sw.js`, `public/icon*` | PWA: home-screen install and offline cache. `sw.js` is registered in `main.ts` (production only); it serves the page network-first and hashed assets cache-first, and drops old builds' assets |
+| `.github/workflows/deploy.yml` | Runs check and build on every push to `main`, then deploys to GitHub Pages |
 | `src/lib/Stats.svelte` | Stats and settings. Tap the version number 7 times to unlock the debug tools. |
 
 ## Conventions

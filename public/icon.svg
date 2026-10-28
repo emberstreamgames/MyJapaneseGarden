@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="bg" cx="0.5" cy="0.15" r="0.95"><stop offset="0" stop-color="#3a2f72"/><stop offset="1" stop-color="#12131f"/></radialGradient>
+    <linearGradient id="mound" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a06f46"/><stop offset="0.5" stop-color="#7c5234"/><stop offset="1" stop-color="#553621"/></linearGradient>
+    <linearGradient id="leaf" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#93d86f"/><stop offset="1" stop-color="#4c9a3b"/></linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <circle cx="256" cy="250" r="150" fill="#7c5cff" opacity="0.18"/>
+  <!-- soil mound, kept inside the maskable safe zone -->
+  <ellipse cx="256" cy="372" rx="132" ry="44" fill="#1c120a" opacity="0.5"/>
+  <path d="M124 368 Q256 290 388 368 Q256 400 124 368 Z" fill="url(#mound)"/>
+  <!-- sprout -->
+  <path d="M256 336 C254 296 258 250 256 196" fill="none" stroke="#3f8a32" stroke-width="14" stroke-linecap="round"/>
+  <path d="M254 262 C200 268 156 236 148 180 C206 174 248 206 254 262 Z" fill="url(#leaf)"/>
+  <path d="M258 222 C300 226 352 196 364 132 C298 126 262 166 258 222 Z" fill="url(#leaf)"/>
+  <path d="M254 262 C222 248 190 222 168 194" fill="none" stroke="#2f6e26" stroke-width="5" stroke-linecap="round" opacity="0.6"/>
+  <path d="M258 222 C290 206 320 180 344 150" fill="none" stroke="#2f6e26" stroke-width="5" stroke-linecap="round" opacity="0.6"/>
+  <!-- sparkle -->
+  <path d="M352 236 L360 256 L380 264 L360 272 L352 292 L344 272 L324 264 L344 256 Z" fill="#ffc94d"/>
+</svg>
