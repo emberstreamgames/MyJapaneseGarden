@@ -8,8 +8,9 @@
   import Menu from './lib/Menu.svelte'
   import Shop from './lib/Shop.svelte'
   import Stats from './lib/Stats.svelte'
+  import Tour from './lib/Tour.svelte'
   import { N5, type Lesson } from './data/build'
-  import { app, level, levelHold, toggleLesson, type Preserved } from './lib/store.svelte'
+  import { app, level, levelHold, setTour, toggleLesson, tourDid, type Preserved } from './lib/store.svelte'
 
   type Tab = 'garden' | 'shop' | 'collection' | 'hiragana' | 'katakana' | 'kanji' | 'vocab' | 'grammar' | 'stats'
   const tabs: { id: Tab; label: string }[] = [
@@ -31,7 +32,14 @@
     tab = id
     fresh = null
     placeAt = null
+    // The tutorial's shop steps: opening the shop, then leaving it.
+    tourDid(id === 'shop' ? 'shop' : 'shop-visit')
   }
+
+  // Replaying the tutorial (from Stats) starts in the garden.
+  $effect(() => {
+    if (app.tour === 'hello') untrack(() => go('garden'))
+  })
 
   function shopFor(spot: number | null) {
     go('shop')
@@ -69,7 +77,7 @@
 <main>
   <header>
     <h1>My Japanese Garden</h1>
-    <Menu items={tabs} current={tab} onselect={go} />
+    <Menu items={tabs} current={tab} onselect={go} actions={[{ label: '🎓 Replay tutorial', run: () => (setTour('hello'), go('garden')) }]} />
   </header>
 
   {#if chips}
@@ -96,6 +104,7 @@
   {/if}
 </main>
 
+<Tour screen={tab} onGarden={() => go('garden')} />
 <CoinFlights />
 {#if showLevel && due}
   <LevelUp from={due.from} to={due.to} onClose={() => ((showLevel = false), (due = null))} />

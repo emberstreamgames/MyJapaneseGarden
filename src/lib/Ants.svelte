@@ -1,9 +1,10 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
   import { flyCoinsFrom } from './coinfly.svelte'
   import { ANT_COINS } from './garden'
   import { ANT_LANES, BLEED, VIEW } from './meadow'
   import * as sfx from './sfx'
-  import { antCoinReady, app, collectAntCoin } from './store.svelte'
+  import { antCoinReady, app, collectAntCoin, tourDid } from './store.svelte'
 
   // Ambient ants on the lawn while the garden is open. Now and then a short line of them walks a lane,
   // some carrying a crumb or food. When an ant coin is due (garden.ts antCoinDue) the next lead ant
@@ -18,6 +19,7 @@
     duration: number
     delay: number
     carry: Carry
+    paused?: boolean // the tutorial's coin ant, waiting halfway to be tapped
   }
 
   const SPEED = 26 // bed units per second
@@ -62,7 +64,8 @@
     const base = ANT_LANES[Math.floor(Math.random() * ANT_LANES.length)]
     const jittered = base.map(([x, y], i) => (i && i < base.length - 1 ? [x + rand(-4, 4), y + rand(-4, 4)] : [x, y]) as Pt)
     const lane = Math.random() < 0.5 ? jittered : [...jittered].reverse()
-    const coin = antCoinReady() && !ants.some((a) => a.carry === 'coin')
+    // During the tutorial, coin ants wait for their own step.
+    const coin = antCoinReady() && !ants.some((a) => a.carry === 'coin') && (!app.tour || app.tour === 'ant')
     // Without motion, only the coin ant shows up, standing still on the lawn.
     if (reduced && !coin) return
     const { raw, len } = walk(lane)
@@ -85,6 +88,25 @@
     return () => clearTimeout(t)
   })
 
+  // The tutorial sends a coin ant out straight away, and another if one walks off untapped.
+  // (Its ant stops halfway, so that only happens if the step is left meanwhile.)
+  $effect(() => {
+    if (app.tour !== 'ant' || !antCoinReady() || ants.some((a) => a.carry === 'coin')) return
+    const t = setTimeout(spawn, 800)
+    return () => clearTimeout(t)
+  })
+
+  // Leaving the ant step (done or skipped) lets a stopped ant walk on.
+  $effect(() => {
+    if (app.tour === 'ant') return
+    for (const ant of untrack(() => ants)) if (ant.paused) resume(ant)
+  })
+
+  function resume(ant: Ant) {
+    ant.paused = false
+    anims.get(ant.id)?.play()
+  }
+
   const drop = (id: number) => {
     anims.delete(id)
     ants = ants.filter((a) => a.id !== id)
@@ -99,10 +121,25 @@
     const a = el.animate($state.snapshot(ant.keys), { duration: ant.duration, delay: ant.delay, fill: 'both' })
     anims.set(ant.id, a)
     a.finished.then(() => drop(ant.id), () => {})
-    return () => a.cancel()
+    // On the tutorial's ant step, the coin ant stops halfway along its lane (at constant speed, half
+    // the time) and waits to be tapped.
+    const stop =
+      ant.carry === 'coin' && app.tour === 'ant'
+        ? setTimeout(() => {
+            if (app.tour !== 'ant' || ant.carry !== 'coin') return
+            a.pause()
+            ant.paused = true
+          }, ant.delay + ant.duration / 2)
+        : undefined
+    return () => {
+      clearTimeout(stop)
+      a.cancel()
+    }
   }
 
-  const mover = (ant: Ant) => (el: SVGGElement) => move(el, ant)
+  // Untracked: an attachment reruns when what it reads changes, and that would restart the walk
+  // (dropping the coin, or the tutorial moving on).
+  const mover = (ant: Ant) => (el: SVGGElement) => untrack(() => move(el, ant))
 
   function tap(ant: Ant, e: Event) {
     const el = e.currentTarget as SVGGElement
@@ -112,11 +149,14 @@
     if (collectAntCoin()) {
       if (!app.muted) sfx.coin()
       flyCoinsFrom(el, ANT_COINS)
+      tourDid('ant')
     }
     // Lighter now, it scurries off. Without motion it simply leaves.
     const a = anims.get(ant.id)
-    if (a) a.playbackRate = 2.5
-    else drop(ant.id)
+    if (a) {
+      a.playbackRate = 2.5
+      resume(ant)
+    } else drop(ant.id)
   }
 </script>
 
@@ -130,6 +170,7 @@
       <g
         class="ant"
         class:coin
+        class:paused={ant.paused}
         role={coin ? 'button' : undefined}
         tabindex={coin ? 0 : undefined}
         aria-label={coin ? 'Ant carrying a coin, tap to take it' : undefined}

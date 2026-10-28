@@ -12,6 +12,7 @@ import { discover, flowerKey, normalizeCollection, press, type Collection } from
 import { DECOR_BY_ID, buy, move, newDecor, normalizeDecor, place, unplace, type DecorState } from './decor'
 import { DECOR_SPOTS, WEED_SPOTS } from './meadow'
 import { dayNumber, newStreak, normalizeStreak, studyOn, type Streak, type StudyResult } from './streak'
+import { nextStep, normalizeTour, type TourStep } from './tour'
 
 export type Mode = 'mix' | 'choice' | 'type'
 
@@ -39,6 +40,7 @@ interface Saved {
   streak: Streak
   collection: Collection // pressed flowers, keyed by collection.ts flowerKey
   decor: DecorState // lawn decorations bought in the shop
+  tour: TourStep | null // tutorial step, null once finished or skipped
   debug: boolean // hidden debug tools unlocked in Settings
   lessons: Lesson[] // enabled chips: Genki lessons and/or 'n5'
   stats: Record<string, Stat>
@@ -50,7 +52,7 @@ interface Saved {
 
 const KEY = 'genki-study-v1'
 
-const SAVE_VERSION = 5 // 3: coins, weeds and ants. 4: streak, collection, visitors. 5: decorations
+const SAVE_VERSION = 6 // 3: coins, weeds and ants. 4: streak, collection, visitors. 5: decorations. 6: tutorial
 
 const defaults = (): Saved => ({
   version: SAVE_VERSION,
@@ -65,6 +67,7 @@ const defaults = (): Saved => ({
   streak: newStreak(),
   collection: {},
   decor: newDecor(DECOR_SPOTS.length),
+  tour: 'hello',
   debug: false,
   lessons: [1, 2],
   stats: {},
@@ -93,6 +96,8 @@ function repair(data: Saved): Saved {
   data.collection = found
   data.decor = normalizeDecor(data.decor, DECOR_SPOTS.length)
   data.mode = normalizeMode(data.mode)
+  // Players from before the tutorial already know their way around.
+  data.tour = data.version < 6 ? null : normalizeTour(data.tour)
   data.version = SAVE_VERSION
   return data
 }
@@ -343,7 +348,7 @@ export function removePlant(i: number): boolean {
 
 export function buyDecor(id: string): boolean {
   const kind = DECOR_BY_ID[id]
-  const next = kind && app.coins >= kind.price && buy(app.decor, id)
+  const next = kind && !kind.gift && app.coins >= kind.price && buy(app.decor, id)
   if (!next) return false
   app.coins -= kind.price
   app.decor = next
@@ -358,9 +363,40 @@ function setDecor(next: DecorState | null): boolean {
   return true
 }
 
+// The tutorial's welcome gift, placed on the spot the player tapped. Given once, even on a replay.
+export function giftRock(spot: number): boolean {
+  const owned = buy(app.decor, 'rock')
+  return app.tour === 'shop' && !app.decor.owned.rock && !!owned && setDecor(place(owned, spot, 'rock'))
+}
+
 export const placeDecor = (spot: number, id: string) => setDecor(place(app.decor, spot, id))
 export const storeDecor = (spot: number) => setDecor(unplace(app.decor, spot))
 export const moveDecor = (from: number, to: number) => setDecor(move(app.decor, from, to))
+
+// The tutorial. Components report what the player did; it only counts on the step that asked for it.
+
+export function tourDid(step: TourStep) {
+  if (app.tour !== step) return
+  app.tour = nextStep(step)
+  save()
+}
+
+export function setTour(step: TourStep | null) {
+  app.tour = step
+  save()
+}
+
+// Make sure what the current step asks for is there: a visitor or ant coin due, a weed, an empty plot.
+export function prepTour(now = Date.now()) {
+  if (app.tour === 'visitor' && !visitorDue(app.visitorAt, now)) app.visitorAt = 0
+  else if (app.tour === 'ant' && !antCoinDue(app.antCoinAt, now)) app.antCoinAt = 0
+  else if (app.tour === 'weed' && !app.weeds.length) {
+    app.weedAt = Math.min(app.weedAt, now) - WEED_EVERY_MS
+    tendWeeds(now)
+  } else if (app.tour === 'plant' && app.garden.every((p) => p)) return tourDid('plant')
+  else return
+  save()
+}
 
 // Debug tools, unlocked from Settings. They bypass the normal rules on purpose.
 

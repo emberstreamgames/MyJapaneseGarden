@@ -29,6 +29,7 @@ A Japanese study app built around the Genki I textbook. There's flashcard practi
 | `Welcome.svelte` | Welcome-back card shown by `Garden` after `WELCOME_AFTER_MS` away (`seenAt`) |
 | `src/lib/decor.ts`, `Decor.svelte`, `DecorSprite.svelte`, `Shop.svelte` | Lawn decorations: the shop catalog and pure place/move/unplace rules (`decor.ts`), the garden layer on `DECOR_SPOTS` (tap an empty spot to pick from the inventory, tap a placed one to take it back, drag to move or swap), the art, and the shop screen |
 | `coinfly.svelte.ts`, `CoinFlights.svelte` | Coins flying from where they were earned to the element marked `data-coin-target` (the garden HUD counter). Counters show `app.coins - inFlight.coins` so they tick up as coins land |
+| `src/lib/tour.ts`, `Tour.svelte` | New-player tutorial: the step order (`TOUR_STEPS`) and the overlay card with a spotlight that follows its target. Components report actions with `tourDid(step)` |
 | `LevelUp.svelte` | Full-screen level-up: the old number shakes and shrinks, then pops into the new one with confetti. `App` shows it whenever `level()` rises |
 | `Visitors.svelte` | Butterflies and birds: one lands when a visitor is due, and tapping it opens a card with a review word and coins |
 | `src/lib/quiz.svelte.ts` | `Quiz` class shared by free practice and garden quizzes (weighted picks, choice/type) |
@@ -50,7 +51,7 @@ A Japanese study app built around the Genki I textbook. There's flashcard practi
 - Sound callers check `app.muted` before calling `sfx.*`.
 - Item ids come from their content (`v-<jp>-<meaning>`, `n5-<jp>-<meaning>`, `j-<kanji>`, `g-<sentence>`, `h-`/`k-<kana>`), and stats are stored under them. Changing a row's prompt or main meaning resets its stats.
 - Typed answers are stored trimmed and lowercased. Grammar rows should include romaji alternatives.
-- Saved data: key `genki-study-v1`, `SAVE_VERSION = 5`. Loaded or imported garden data always goes through `normalizeGarden`. If the save shape changes, bump the version and migrate in `repair()` (used by both `load()` and `importData()`).
+- Saved data: key `genki-study-v1`, `SAVE_VERSION = 6`. Loaded or imported garden data always goes through `normalizeGarden`. If the save shape changes, bump the version and migrate in `repair()` (used by both `load()` and `importData()`).
 - Code style: no semicolons, single quotes, 2-space indent, short comments that explain why.
 
 ## Game rules (quick reference)
@@ -69,6 +70,8 @@ A Japanese study app built around the Genki I textbook. There's flashcard practi
 - Collection: a species/variant is discovered when a plant of it blooms. Once a bloomed plant has been groomed `PRESERVE_GROOMS` (3) times, it can be preserved: the plot is freed, the flower is pressed into the collection (completing it), and the player is taken to the Collection page. It pays 25 coins, plus 50 the first time a flower is completed.
 - Welcome back: opening the garden after 4 h or more away shows what changed (ready and thirsty plants, new weeds, an ant coin, the streak or rain).
 - Shop and decorations: 8 decorations (40 to 400 coins) can be bought any number of times and placed on 6 lawn spots (`DECOR_SPOTS`, kept clear of weed spots). Saved as `decor: { owned, placed }`, repaired by `normalizeDecor`. If the shop was opened from an empty spot's picker, the next purchase is placed on that spot.
+- Shiny rock: a gift-only decoration from the tutorial (`gift: true`, so it's left out of `SHOP_DECOR` and `buyDecor` refuses it). `giftRock` gives it once, even on a replay.
+- Tutorial: new saves start at `tour: 'hello'`; saves from before version 6 skip it. Steps: welcome, HUD, visitor, ant, weed, plant (the sheet closes without offering water), shop (the first + tapped holds a gift: a shiny rock, placed on that spot, then a button to the shop), inside the shop, tap the 💧, take the quiz. During it, visitors and coin ants only come on their own steps (called in at once; the coin ant stops halfway along its lane until tapped), and the weed asks hiragana. `prepTour` makes sure each step's target exists. Closing the plot sheet on the last step goes back to the 💧 step. Replay from the menu or Stats; skip from the card.
 - Level-ups: a popup celebrates each new level (it plays the level-up sound; the quiz no longer does). It waits while a quiz holds `levelHold` (`holdLevelUps()`): a garden or weed quiz until it closes, free practice until Next is pressed.
 - Visitors: once `VISITOR_EVERY_MS` (20 min) has passed since the last one was thanked, a butterfly (usually on a flower) or a bird (on the lawn) lands. It carries a rolled-up note until thanked. Tapping it shows a vocab word to review (missed words come up more often); confirming gives 1-3 coins. One that isn't thanked leaves after 2.5 min, and a later one comes instead.
 

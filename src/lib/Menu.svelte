@@ -1,7 +1,13 @@
 <script lang="ts" generics="T extends string">
   import { fade, fly } from 'svelte/transition'
 
-  let { items, current, onselect }: { items: { id: T; label: string }[]; current: T; onselect: (id: T) => void } = $props()
+  // `actions` sit under the screens, apart from them: they do something instead of switching screen.
+  let {
+    items,
+    current,
+    onselect,
+    actions = [],
+  }: { items: { id: T; label: string }[]; current: T; onselect: (id: T) => void; actions?: { label: string; run: () => void }[] } = $props()
 
   let open = $state(false)
   let toggle: HTMLButtonElement
@@ -12,6 +18,11 @@
 
   function choose(id: T) {
     onselect(id)
+    open = false
+  }
+
+  function act(run: () => void) {
+    run()
     open = false
   }
 
@@ -46,6 +57,11 @@
         in:fly|global={{ x: 48, delay: ms(80 + i * 35), duration: ms(240) }}
       >
         {it.label}
+      </button>
+    {/each}
+    {#each actions as a, i (a.label)}
+      <button class="menu-action" class:first={i === 0} onclick={() => act(a.run)} in:fly|global={{ x: 48, delay: ms(80 + (items.length + i) * 35), duration: ms(240) }}>
+        {a.label}
       </button>
     {/each}
   </nav>

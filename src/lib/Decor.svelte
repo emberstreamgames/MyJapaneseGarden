@@ -3,7 +3,7 @@
   import DecorSprite from './DecorSprite.svelte'
   import { DECOR_SPOTS, VIEW, decorBox } from './meadow'
   import * as sfx from './sfx'
-  import { app, moveDecor, placeDecor, storeDecor } from './store.svelte'
+  import { app, giftRock, moveDecor, placeDecor, storeDecor } from './store.svelte'
 
   // Decorations on the lawn. An empty spot shows a faint marker: tap it to pick something from the
   // inventory. Tap a decoration to put it back in the inventory, or drag it to another spot (a
@@ -15,6 +15,10 @@
   const REACH = 38 // bed units from a spot's middle that still count as dropping on it
 
   let picking = $state<number | null>(null)
+  let gifted = $state(false) // the tutorial's rock was just placed: the sheet says so and points to the shop
+  // On the tutorial's shop step, the first + tapped holds a gift instead of the inventory.
+  const gift = $derived(app.tour === 'shop' && !app.decor.owned.rock)
+  const rock = DECOR_BY_ID.rock
   // `x`/`y` are the pointer in bed units while dragging.
   let drag = $state<{ from: number; id: string; x: number; y: number; over: number | null; moved: boolean } | null>(null)
   let start = { x: 0, y: 0 }
@@ -82,9 +86,20 @@
     picking = null
   }
 
+  function placeGift() {
+    if (picking === null || !giftRock(picking)) return
+    gifted = true
+    if (!app.muted) sfx.grow()
+  }
+
+  function close() {
+    picking = null
+    gifted = false
+  }
+
   function onKey(e: KeyboardEvent) {
     if (e.key === 'Escape') {
-      if (picking !== null) picking = null
+      if (picking !== null) close()
       else drag = null
     }
   }
@@ -133,11 +148,23 @@
 
 {#if picking !== null}
   <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-  <div class="backdrop" onclick={(e) => e.target === e.currentTarget && (picking = null)}>
-    <div class="sheet" role="dialog" aria-modal="true" aria-label="Place a decoration">
-      <button class="x" aria-label="Close" onclick={() => (picking = null)}>✕</button>
-      <h2>Place a decoration</h2>
-      {#if inventory.length}
+  <div class="backdrop" onclick={(e) => e.target === e.currentTarget && close()}>
+    <div class="sheet" role="dialog" aria-modal="true" aria-label={gift || gifted ? 'A gift for your garden' : 'Place a decoration'}>
+      <button class="x" aria-label="Close" onclick={close}>✕</button>
+      {#if gifted}
+        <div class="decor-gift"><DecorSprite id={rock.id} /></div>
+        <h2>It looks lovely!</h2>
+        <p class="dim">Find more decorations in the garden shop, bought with the coins you earn.</p>
+        <button class="primary big-btn" onclick={() => (close(), onShop(null))}>🛍️ Open the garden shop</button>
+      {:else if gift}
+        <h2>🎁 A gift for you!</h2>
+        <div class="decor-gift"><DecorSprite id={rock.id} /></div>
+        <b>{rock.label}</b>
+        <span class="shop-ja"><span lang="ja">{rock.ja}</span> <span class="dim">({rock.reading})</span></span>
+        <p class="dim">Every garden needs a first decoration. This one is on the house.</p>
+        <button class="primary big-btn" onclick={placeGift}>Place it here</button>
+      {:else if inventory.length}
+        <h2>Place a decoration</h2>
         <p class="dim">Pick one from your inventory. You can drag it to another spot later, or tap it to put it back.</p>
         <div class="decor-picks">
           {#each inventory as d (d.id)}
@@ -152,6 +179,7 @@
         </div>
         <button class="linkish shop-link" onclick={() => onShop(picking)}>Visit the garden shop for more 🛍️</button>
       {:else}
+        <h2>Place a decoration</h2>
         <p class="dim">Your inventory is empty. Decorations can be purchased in the garden shop.</p>
         <button class="primary big-btn" onclick={() => onShop(picking)}>🛍️ Open the garden shop</button>
       {/if}

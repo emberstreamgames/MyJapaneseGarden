@@ -6,7 +6,7 @@
   import { BLEED, SPOTS, VIEW, WEED_SPOTS } from './meadow'
   import { STEM_TOP } from './plants'
   import * as sfx from './sfx'
-  import { app, collectVisitor, reminderItem, visitorReady } from './store.svelte'
+  import { app, collectVisitor, reminderItem, tourDid, visitorReady } from './store.svelte'
 
   // Garden visitors. Once a visitor is due (garden.ts visitorDue), a butterfly or a bird flies in and
   // settles: butterflies on an open flower when there is one, birds on the lawn. Tapping it opens a
@@ -62,7 +62,8 @@
   const flowerTop = (i: number): Pt => ({ x: SPOTS[i].x + rand(-3, 3), y: SPOTS[i].y - (86 - STEM_TOP[BLOOMED]) * 0.9 - 4 })
 
   function spawn() {
-    if (document.hidden || visitor || card || !visitorReady()) return
+    // During the tutorial, visitors wait for their own step.
+    if (document.hidden || visitor || card || !visitorReady() || (app.tour && app.tour !== 'visitor')) return
     const kind: Kind = Math.random() < 0.55 ? 'butterfly' : 'bird'
     const flowers = app.garden.flatMap((p, i) => (p && p.stage >= BLOOMED - 1 ? [i] : []))
     const at = kind === 'butterfly' && flowers.length && Math.random() < 0.85 ? flowerTop(pick(flowers)) : lawn()
@@ -78,6 +79,11 @@
       clearTimeout(t)
       clearTimeout(linger)
     }
+  })
+
+  // The tutorial calls one in straight away.
+  $effect(() => {
+    if (app.tour === 'visitor' && visitorReady()) untrack(spawn)
   })
 
   // Keyframes from a to b: butterflies flutter in loops, birds swoop in an arc. Birds face their way.
@@ -102,7 +108,7 @@
     if (!visitor) return
     visitor.state = 'perched'
     clearTimeout(linger)
-    const wait = () => (linger = setTimeout(() => (card ? wait() : leave()), LINGER))
+    const wait = () => (linger = setTimeout(() => (card || app.tour === 'visitor' ? wait() : leave()), LINGER))
     wait()
   }
 
@@ -148,6 +154,7 @@
     const { coins } = card
     card = null
     if (!collectVisitor(coins)) return leave()
+    tourDid('visitor')
     if (!app.muted) sfx.coin()
     if (visitor) visitor.note = false
     flyCoinsFrom(el, coins)

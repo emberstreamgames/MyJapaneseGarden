@@ -1,13 +1,13 @@
 <script lang="ts">
   import { DECK_LABEL, deckReady, type Deck } from '../data/items'
-  import { BLOOMED, GROW_COINS, PRESERVE_GROOMS, SKIP_COST, SPECIES, STAGE_NAMES, canPreserve, formatWait, msUntilReady, phaseOf, speciesFor } from './garden'
+  import { BLOOMED, GROW_COINS, PRESERVE_GROOMS, SKIP_COST, SPECIES, STAGE_NAMES, canPreserve, formatWait, msUntilReady, phaseOf, speciesFor, type Species } from './garden'
   import Celebration from './Celebration.svelte'
   import { flyCoinsFrom } from './coinfly.svelte'
   import PlantSprite from './PlantSprite.svelte'
   import { ART } from './plants'
   import { bloomName } from './blooms'
   import * as sfx from './sfx'
-  import { app, growPlot, plantAt, poolFor, preservePlant, removePlant, skipWait, type Preserved } from './store.svelte'
+  import { app, growPlot, plantAt, poolFor, preservePlant, removePlant, skipWait, tourDid, type Preserved } from './store.svelte'
 
   let {
     index,
@@ -40,6 +40,13 @@
       ;(kind === 'bloom' ? sfx.bloom : sfx.grow)()
       if (grown.found) setTimeout(sfx.fanfare, 1300)
     }
+  }
+
+  function plant(s: Species) {
+    if (!plantAt(index, s) || app.tour !== 'plant') return
+    // The tutorial visits the shop before the first watering, so it doesn't offer the quiz yet.
+    tourDid('plant')
+    onClose()
   }
 
   function preserve() {
@@ -75,12 +82,13 @@
     {#if !plot}
       <h2>Choose a plant</h2>
       <p class="dim">Each plant grows by studying its quiz type.</p>
+      {#if app.tour === 'plant'}<p class="tour-tip">Pick any flower. Cherry blossom and Tulip grow from hiragana, a gentle place to start.</p>{/if}
       {#each DECKS as d (d)}
         <div class="group">
           <h3>{DECK_LABEL[d]}{#if !playable(d)} <span class="dim">· coming soon</span>{/if}</h3>
           <div class="picks">
             {#each speciesFor(d) as s (s)}
-              <button class="pick" disabled={!playable(d)} onclick={() => plantAt(index, s)}>
+              <button class="pick" disabled={!playable(d)} onclick={() => plant(s)}>
                 <PlantSprite species={s} stage={BLOOMED} icon />
                 <span>{SPECIES[s].label}</span>
               </button>

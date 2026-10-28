@@ -7,6 +7,7 @@ export interface DecorKind {
   ja: string // Japanese name, shown with its reading so the shop teaches a word too
   reading: string
   price: number
+  gift?: boolean // given, never sold: left out of the shop
 }
 
 export const DECOR: DecorKind[] = [
@@ -18,7 +19,11 @@ export const DECOR: DecorKind[] = [
   { id: 'bonsai', label: 'Bonsai', ja: '盆栽', reading: 'bonsai', price: 180 },
   { id: 'lantern', label: 'Stone lantern', ja: '石灯籠', reading: 'ishidōrō', price: 250 },
   { id: 'torii', label: 'Torii gate', ja: '鳥居', reading: 'torii', price: 400 },
+  // The tutorial's welcome gift (store.svelte.ts giftRock).
+  { id: 'rock', label: 'Shiny rock', ja: 'ぴかぴかの石', reading: 'pikapika no ishi', price: 0, gift: true },
 ]
+
+export const SHOP_DECOR = DECOR.filter((d) => !d.gift)
 
 export const DECOR_BY_ID: Record<string, DecorKind> = Object.fromEntries(DECOR.map((d) => [d.id, d]))
 

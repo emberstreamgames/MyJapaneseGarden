@@ -11,7 +11,7 @@
   import PlotSheet from './PlotSheet.svelte'
   import PlotTile from './PlotTile.svelte'
   import * as sfx from './sfx'
-  import { antCoinReady, app, finishQuiz, level, levelProgress, markSeen, poolFor, pullWeed, tendWeeds, type Preserved } from './store.svelte'
+  import { antCoinReady, app, finishQuiz, level, levelProgress, markSeen, poolFor, pullWeed, setTour, tendWeeds, tourDid, type Preserved } from './store.svelte'
   import { dayNumber, liveStreak, rainedDays } from './streak'
   import Visitors from './Visitors.svelte'
   import Welcome, { type Away } from './Welcome.svelte'
@@ -88,6 +88,14 @@
   function open(i: number) {
     now = Date.now()
     selected = i
+    const p = app.garden[i]
+    if (p && phaseOf(p, now) === 'thirsty') tourDid('water')
+  }
+
+  function closeSheet() {
+    selected = null
+    // Closed without taking the quiz: the tutorial points back at the 💧.
+    if (app.tour === 'quiz') setTour('water')
   }
 
   function startQuiz(i: number) {
@@ -95,13 +103,14 @@
     if (!p) return
     selected = null
     watered = null
+    tourDid('quiz')
     quiz = { target: i, deck: p.deck, mode: p.stage === BLOOMED ? 'groom' : 'water', bonus: completionBonus(p) }
   }
 
   // A weed asks one question from any deck the enabled chapters cover. The deck is picked first so
-  // the pre-screen can say what kind of question is coming.
+  // the pre-screen can say what kind of question is coming. The tutorial's weed asks hiragana, the gentlest.
   function askWeed(w: Weed) {
-    const decks = DECKS.filter((d) => poolFor(d).length)
+    const decks = app.tour && poolFor('hiragana').length ? ['hiragana' as const] : DECKS.filter((d) => poolFor(d).length)
     weedAsk = { w, deck: decks[Math.floor(Math.random() * decks.length)] ?? 'hiragana' }
   }
 
@@ -114,6 +123,7 @@
   }
 
   function closeQuiz() {
+    if (quiz?.mode === 'weed') tourDid('weed')
     quiz = null
     now = Date.now()
     splash = watered
@@ -202,7 +212,7 @@
   </section>
 
   {#if selected !== null}
-    <PlotSheet index={selected} {now} onClose={() => (selected = null)} onStart={startQuiz} onPreserved={preserved} />
+    <PlotSheet index={selected} {now} onClose={closeSheet} onStart={startQuiz} onPreserved={preserved} />
   {/if}
   {#if weedAsk}
     {@const a = weedAsk}

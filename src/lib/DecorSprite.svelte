@@ -89,6 +89,15 @@
     <path d="M5.5 16.6L20 8.4L34.5 16.6Q20 13.8 5.5 16.6Z" fill="#8a8a82" />
     <circle cx="20" cy="7.2" r="2.3" fill="#9a9a92" />
     <path d="M13 38.5h14" stroke="#7a7a72" stroke-width="0.5" />
+  {:else if id === 'rock'}
+    <path d="M7 41.4Q5.4 33 11 28.4Q16 23.6 23.4 24.6Q31 25.6 33.4 32.4Q35 38.4 32 41.4Z" fill="#8b93a8" />
+    <path d="M11 28.4Q16 23.6 23.4 24.6Q31 25.6 33.4 32.4Q26 29.6 19 31.4Q12.4 33 7.4 37.6Q7.6 31.6 11 28.4Z" fill="#a9b1c6" />
+    <path d="M13.6 28.6Q17.6 26 22.4 26.6Q19.4 28.4 15.6 30.6Z" fill="#dfe5f5" />
+    <path d="M19 31.4Q26 29.6 33.4 32.4M19 31.4L21.4 41.4" fill="none" stroke="#6f7790" stroke-width="0.6" />
+    <!-- Glints: what makes it shiny. They twinkle in turn. -->
+    <path class="rock-glint" d="M16 22.4l0.9 2.6 2.6 0.9-2.6 0.9-0.9 2.6-0.9-2.6-2.6-0.9 2.6-0.9Z" fill="#fff" />
+    <path class="rock-glint" d="M29.6 26l0.6 1.7 1.7 0.6-1.7 0.6-0.6 1.7-0.6-1.7-1.7-0.6 1.7-0.6Z" fill="#fff6c8" />
+    <path class="rock-glint" d="M24.6 34.6l0.5 1.4 1.4 0.5-1.4 0.5-0.5 1.4-0.5-1.4-1.4-0.5 1.4-0.5Z" fill="#fff" />
   {:else if id === 'torii'}
     <rect x="10" y="12" width="3.4" height="28" fill="#d8452f" />
     <rect x="26.6" y="12" width="3.4" height="28" fill="#d8452f" />

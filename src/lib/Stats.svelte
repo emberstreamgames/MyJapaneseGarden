@@ -5,7 +5,7 @@
   import { FLOWERS } from './collection'
   import {
     app, debugAddCoins, debugAntCoin, debugFill, debugPreservable, debugSetStage, debugSkipTime, debugSproutWeed, debugStreakDay, debugVisitor,
-    MASTERY_STREAK, exportData, importData, level, poolFor, resetGarden, resetStats, save,
+    MASTERY_STREAK, exportData, importData, level, poolFor, resetGarden, resetStats, save, setTour,
   } from './store.svelte'
   import { dayNumber, liveStreak } from './streak'
 
@@ -165,6 +165,7 @@
     <label><input type="checkbox" bind:checked={app.muted} onchange={save} /> Mute sounds</label>
     <button onclick={download}>Export progress</button>
     <label class="file">Import progress<input type="file" accept="application/json" onchange={upload} /></label>
+    <button onclick={() => setTour('hello')}>Replay tutorial</button>
     <button class="danger" onclick={reset}>Reset stats</button>
     <button class="danger" onclick={resetPlants}>Reset garden</button>
   </div>

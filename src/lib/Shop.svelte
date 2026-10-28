@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { DECOR, available } from './decor'
+  import { SHOP_DECOR, available } from './decor'
   import DecorSprite from './DecorSprite.svelte'
   import * as sfx from './sfx'
   import { app, buyDecor, placeDecor } from './store.svelte'
@@ -46,7 +46,7 @@
   {/if}
 
   <div class="shop-grid">
-    {#each DECOR as d (d.id)}
+    {#each SHOP_DECOR as d (d.id)}
       {@const owned = app.decor.owned[d.id] ?? 0}
       {@const short = app.coins < d.price}
       <div class="shop-item" class:just={bought?.id === d.id}>
