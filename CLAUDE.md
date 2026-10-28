@@ -1,11 +1,8 @@
-@AGENTS.md
-
-
 # Genki Grow
 
 A Japanese study app built around the Genki I textbook. There's flashcard practice for each deck, plus a garden game: plants grow when you finish 10-question quizzes. Everything runs in the browser and progress is saved to `localStorage`. There's no backend.
 
-**This is a Svelte web app, not a MapleStory Worlds (MSW) project.** Ignore `AGENTS.md` and any MSW skill or router hooks here.
+**This is a Svelte web app, not a MapleStory Worlds (MSW) project.**
 
 ## Stack and commands
 
