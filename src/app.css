@@ -328,7 +328,8 @@ input:focus { outline: none; border-color: var(--accent); }
 .ant.coin { pointer-events: auto; cursor: pointer; outline: none; }
 .ant .ant-hit { fill: transparent; }
 .ant.coin:focus-visible .ant-hit { stroke: var(--gold); stroke-width: 1.5; }
-.ant .ant-glow { fill: #ffd76a; opacity: 0.35; animation: glow 1.2s ease-in-out infinite; }
+.ant .ant-coin { font-size: 8.5px; text-anchor: middle; dominant-baseline: central; }
+.ant .ant-glow { fill: #ffffff; opacity: 0.35; animation: glow 1.2s ease-in-out infinite; }
 .ant-gain { z-index: 1; position: absolute; translate: -50% -100%; color: var(--gold); font-weight: 800; font-size: 1rem; white-space: nowrap; text-shadow: 0 1px 3px #000a; pointer-events: none; animation: rise 0.9s ease-out forwards; }
 
 @keyframes ant-step { from { transform: rotate(-14deg); } to { transform: rotate(14deg); } }

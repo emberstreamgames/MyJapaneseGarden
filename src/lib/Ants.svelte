@@ -205,8 +205,7 @@
   {:else if carry === 'leaf'}
     <path d="M6.2 0Q8.5-3.5 12-1.5Q9 2.5 6.2 0Z" fill="#6cbf4a" stroke="#3f8a32" stroke-width="0.3" />
   {:else if carry === 'coin'}
-    <circle cx="9" r="3.6" fill="#ffcf3f" stroke="#c4900f" stroke-width="0.8" />
-    <circle cx="9" r="2.1" fill="none" stroke="#e8a91c" stroke-width="0.6" />
-    <path d="M7.6-1.6Q8.4-2.4 9.4-2.3" stroke="#fff6c8" stroke-width="0.7" fill="none" stroke-linecap="round" />
+    <!-- The same 🪙 as the coin counter, so it reads as a coin on every device. -->
+    <text class="ant-coin" x="9">🪙</text>
   {/if}
 {/snippet}
