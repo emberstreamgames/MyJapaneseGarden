@@ -3,7 +3,11 @@ import type { Deck, Item } from './items'
 // Helpers that turn compact hand-written rows into Items. See docs/CONTENT.md.
 
 export const norm = (s: string) => s.trim().toLowerCase()
-export const lessonTag = (n: number) => (n === 0 ? 'Intro' : `Lesson ${n}`)
+
+// N5 Prep is a study group outside the Genki chapters; it has its own chip.
+export const N5 = 'n5' as const
+export type Lesson = number | typeof N5
+export const lessonTag = (n: Lesson) => (n === N5 ? 'N5 Prep' : n === 0 ? 'Intro' : `Lesson ${n}`)
 
 // Rows are grouped by Genki lesson (0 = Greetings/Numbers, 1-12).
 export type ByLesson<R> = Record<number, R[]>

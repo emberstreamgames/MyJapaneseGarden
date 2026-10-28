@@ -109,7 +109,6 @@
     <label>Answer style
       <select bind:value={app.mode} onchange={save}>
         <option value="mix">Mix</option>
-        <option value="flip">Flip cards</option>
         <option value="choice">Multiple choice</option>
         <option value="type">Typed</option>
       </select>

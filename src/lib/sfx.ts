@@ -52,6 +52,22 @@ export function water() {
   tone(330, 0.6, 0.35, 'sine', 0.07)
 }
 
+// One soft plop as water soaks into the soil.
+export function splash() {
+  if (!ready() || !ctx) return
+  const o = ctx.createOscillator()
+  const g = ctx.createGain()
+  const t = ctx.currentTime
+  o.type = 'sine'
+  o.frequency.setValueAtTime(1100, t)
+  o.frequency.exponentialRampToValueAtTime(260, t + 0.18)
+  g.gain.setValueAtTime(0.14, t)
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3)
+  o.connect(g).connect(ctx.destination)
+  o.start(t)
+  o.stop(t + 0.3)
+}
+
 // A light sparkle for grooming.
 export function groom() {
   if (!ready()) return

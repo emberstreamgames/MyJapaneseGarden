@@ -24,13 +24,7 @@
           <div class="big" class:long={current.front.length > 4} lang="ja">{current.front}</div>
           {#if current.hint}<div class="hint">{current.hint}</div>{/if}
 
-          {#if quiz.kind === 'flip'}
-            {#if !quiz.flipped && !quiz.result}
-              <button class="primary" onclick={() => quiz.reveal()}>Show answer</button>
-            {:else}
-              <div class="answer">{current.back}</div>
-            {/if}
-          {:else if quiz.kind === 'type'}
+          {#if quiz.kind === 'type'}
             {#if !quiz.result}
               <form onsubmit={(e) => quiz.submitTyped(e)}>
                 <!-- svelte-ignore a11y_autofocus -->
@@ -69,13 +63,6 @@
         {#key quiz.gain.id}<div class="gain" aria-hidden="true">+{quiz.gain.amount} XP</div>{/key}
       {/if}
     </div>
-
-    {#if quiz.kind === 'flip' && quiz.flipped && !quiz.result}
-      <div class="row">
-        <button class="miss" onclick={() => quiz.answer(false)}>✗ Missed it</button>
-        <button class="hit" onclick={() => quiz.answer(true)}>✓ Got it</button>
-      </div>
-    {/if}
 
     {#if quiz.result}
       <div class="row">

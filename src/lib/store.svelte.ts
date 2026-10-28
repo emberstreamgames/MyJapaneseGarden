@@ -1,7 +1,14 @@
+import type { Lesson } from '../data/build'
 import { ITEMS, deckReady, type Deck, type Item } from '../data/items'
 import { BLOOMED, COOLDOWN_MS, PLOT_COUNT, SEEDED, SPECIES, advance, completeQuiz, completionBonus, normalizeGarden, plantSeed, type Plot, type Species } from './garden'
+import { rollVariant } from './blooms'
 
-export type Mode = 'mix' | 'flip' | 'choice' | 'type'
+export type Mode = 'mix' | 'choice' | 'type'
+
+const MODES: Mode[] = ['mix', 'choice', 'type']
+
+// Older saves may hold the removed 'flip' mode (or junk): fall back to mix.
+const normalizeMode = (m: unknown): Mode => (MODES.includes(m as Mode) ? (m as Mode) : 'mix')
 
 export interface Stat {
   c: number // times correct
@@ -14,7 +21,7 @@ interface Saved {
   version: number // save format version, for future migrations
   garden: (Plot | null)[] // PLOT_COUNT slots; null is an empty plot
   debug: boolean // hidden debug tools unlocked in Settings
-  lessons: number[]
+  lessons: Lesson[] // enabled chips: Genki lessons and/or 'n5'
   stats: Record<string, Stat>
   xp: number
   best: number // best combo ever
@@ -44,6 +51,7 @@ function load(): Saved {
     if (raw) {
       const data = { ...defaults(), ...JSON.parse(raw) }
       data.garden = normalizeGarden(data.garden)
+      data.mode = normalizeMode(data.mode)
       data.version = SAVE_VERSION
       return data
     }
@@ -63,7 +71,7 @@ export function save() {
   }
 }
 
-export function toggleLesson(n: number) {
+export function toggleLesson(n: Lesson) {
   const i = app.lessons.indexOf(n)
   if (i >= 0) app.lessons.splice(i, 1)
   else app.lessons.push(n)
@@ -98,6 +106,7 @@ export function importData(text: string): boolean {
     if (typeof data !== 'object' || !data || typeof data.stats !== 'object') return false
     Object.assign(app, defaults(), data)
     app.garden = normalizeGarden(data.garden)
+    app.mode = normalizeMode(data.mode)
     app.version = SAVE_VERSION
     save()
     return true
@@ -119,7 +128,7 @@ const validSlot = (i: number) => Number.isInteger(i) && i >= 0 && i < PLOT_COUNT
 
 export function plantAt(i: number, species: Species): boolean {
   if (!validSlot(i) || app.garden[i]) return false
-  app.garden[i] = plantSeed(species)
+  app.garden[i] = plantSeed(species, rollVariant(species, Math.random()))
   save()
   return true
 }
@@ -177,7 +186,7 @@ export function debugFill() {
     if (p) return p
     const sp = species[Math.floor(Math.random() * species.length)]
     const stage = SEEDED + Math.floor(Math.random() * BLOOMED)
-    return { ...plantSeed(sp), stage, waters: stage - SEEDED }
+    return { ...plantSeed(sp, rollVariant(sp, Math.random())), stage, waters: stage - SEEDED }
   })
   save()
 }

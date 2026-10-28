@@ -1,4 +1,5 @@
 import type { Deck } from '../data/items'
+import { BLOOMS } from './blooms'
 
 // Pure garden rules. No store or DOM access, so every function here is easy to check and to time-travel.
 
@@ -45,6 +46,7 @@ export interface Plot {
   doneAt: number | null // when the last quiz was finished; null until the first one of this stage
   waters: number // times watered (any stage before bloom)
   grooms: number // times groomed (once bloomed)
+  variant: number // bloom colour, rolled at planting: 0 = original, 1.. = BLOOMS[species] (blooms.ts)
 }
 
 export type Phase =
@@ -73,8 +75,8 @@ export function formatWait(ms: number): string {
 
 // The actions below return the updated plot, or null when the action isn't allowed right now.
 
-export function plantSeed(species: Species): Plot {
-  return { species, deck: SPECIES[species].deck, stage: SEEDED, doneAt: null, waters: 0, grooms: 0 }
+export function plantSeed(species: Species, variant = 0): Plot {
+  return { species, deck: SPECIES[species].deck, stage: SEEDED, doneAt: null, waters: 0, grooms: 0, variant }
 }
 
 export const completionBonus = (plot: Plot): number => (plot.stage === BLOOMED ? GROOM_BONUS_XP : WATER_BONUS_XP)
@@ -110,6 +112,7 @@ export function normalizeGarden(raw: unknown): (Plot | null)[] {
       doneAt: typeof p.doneAt === 'number' && Number.isFinite(p.doneAt) ? p.doneAt : null,
       waters: num(p.waters),
       grooms: num(p.grooms),
+      variant: Math.min(BLOOMS[species].length, num(p.variant)), // older saves have none: original colours
     }
   })
 }

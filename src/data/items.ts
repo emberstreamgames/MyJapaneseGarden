@@ -1,5 +1,7 @@
+import { N5, type Lesson } from './build'
 import { grammarItems } from './grammar'
 import { kanjiItems } from './kanji'
+import { n5VocabItems } from './n5vocab'
 import { vocabItems } from './vocab'
 
 export type Deck = 'hiragana' | 'katakana' | 'kanji' | 'vocab' | 'grammar'
@@ -7,7 +9,7 @@ export type Deck = 'hiragana' | 'katakana' | 'kanji' | 'vocab' | 'grammar'
 export interface Item {
   id: string
   type: Deck
-  lesson: number // 0 = Greetings/Numbers, 1-12 = Genki I lessons
+  lesson: Lesson // 0 = Greetings/Numbers, 1-12 = Genki I lessons, 'n5' = N5 Prep
   front: string // what is shown as the prompt
   back: string // display form of the answer
   answers: string[] // accepted typed answers (lowercase)
@@ -77,6 +79,7 @@ export const ITEMS: Item[] = [
   ...build(handakuten, 'handakuten'),
   ...build(combo, 'combo'),
   ...vocabItems(),
+  ...n5VocabItems(),
   ...kanjiItems(),
   ...grammarItems(),
 ]
@@ -104,7 +107,8 @@ if (import.meta.env.DEV) {
     if (!it.front || !it.back) problems.push('empty front or back')
     if (!it.answers.length) problems.push('no accepted answers')
     if (it.answers.some((a) => a !== a.trim().toLowerCase())) problems.push('answers must be trimmed lowercase')
-    if (!Number.isInteger(it.lesson) || it.lesson < 0 || it.lesson > 12) problems.push('lesson must be 0-12')
+    const l = it.lesson
+    if (l !== N5 && (typeof l !== 'number' || !Number.isInteger(l) || l < 0 || l > 12)) problems.push("lesson must be 0-12 or 'n5'")
     if (problems.length) console.warn(`[items] ${it.id}: ${problems.join(', ')}`)
   }
 }

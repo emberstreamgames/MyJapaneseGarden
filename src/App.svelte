@@ -1,7 +1,9 @@
 <script lang="ts">
   import Flashcards from './lib/Flashcards.svelte'
   import Garden from './lib/Garden.svelte'
+  import Menu from './lib/Menu.svelte'
   import Stats from './lib/Stats.svelte'
+  import { N5, type Lesson } from './data/build'
   import { app, toggleLesson } from './lib/store.svelte'
 
   type Tab = 'garden' | 'hiragana' | 'katakana' | 'kanji' | 'vocab' | 'grammar' | 'stats'
@@ -15,25 +17,20 @@
     { id: 'stats', label: 'Stats' },
   ]
   let tab = $state<Tab>('garden')
-  const lessons = Array.from({ length: 13 }, (_, i) => i)
+  const lessons: Lesson[] = [...Array.from({ length: 13 }, (_, i) => i), N5]
 </script>
 
 <main>
   <header>
-    <h1>元気 Study</h1>
+    <h1>My Japanese Garden</h1>
+    <Menu items={tabs} current={tab} onselect={(id) => (tab = id)} />
   </header>
-
-  <nav class="tabs">
-    {#each tabs as t (t.id)}
-      <button class:active={tab === t.id} onclick={() => (tab = t.id)}>{t.label}</button>
-    {/each}
-  </nav>
 
   <div class="chapters" role="group" aria-label="Chapters in your review pool">
     <span class="lbl">Chapters</span>
     {#each lessons as n (n)}
-      <button class="chip" class:on={app.lessons.includes(n)} aria-pressed={app.lessons.includes(n)} onclick={() => toggleLesson(n)}>
-        {n === 0 ? 'Intro' : n}
+      <button class="chip" class:on={app.lessons.includes(n)} class:n5={n === N5} aria-pressed={app.lessons.includes(n)} onclick={() => toggleLesson(n)}>
+        {n === N5 ? 'N5 Prep' : n === 0 ? 'Intro' : n}
       </button>
     {/each}
   </div>

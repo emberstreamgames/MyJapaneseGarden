@@ -2,14 +2,13 @@ import { ITEMS, type Deck, type Item } from '../data/items'
 import { app, level, poolFor, record, save } from './store.svelte'
 import * as sfx from './sfx'
 
-export type Kind = 'flip' | 'choice' | 'type'
+export type Kind = 'choice' | 'type'
 
 // The question/answer engine shared by free practice and the garden quizzes.
 export class Quiz {
   current = $state<Item | null>(null)
-  kind = $state<Kind>('flip')
+  kind = $state<Kind>('choice')
   options = $state<string[]>([])
-  flipped = $state(false)
   typed = $state('')
   result = $state<null | 'right' | 'wrong'>(null)
   picked = $state('')
@@ -63,11 +62,10 @@ export class Quiz {
     }
     this.current = pick
     this.lastId = pick.id
-    this.flipped = false
     this.typed = ''
     this.result = null
     this.picked = ''
-    const kinds: Kind[] = app.mode === 'mix' ? ['flip', 'choice', 'type'] : [app.mode]
+    const kinds: Kind[] = app.mode === 'mix' ? ['choice', 'type'] : [app.mode]
     this.kind = kinds[Math.floor(Math.random() * kinds.length)]
     if (this.kind === 'choice') {
       this.makeOptions(pick)
@@ -78,9 +76,11 @@ export class Quiz {
 
   private makeOptions(it: Item) {
     const deck = this.deck
-    const others = [...new Set(ITEMS.filter((i) => i.type === deck && i.back !== it.back).map((i) => i.back))]
+    // skip rows sharing any accepted answer (家 "home; house" vs うち "home; house; my place"): both would be right
+    const distinct = (i: Item) => i.back !== it.back && !i.answers.some((a) => it.answers.includes(a))
+    const others = [...new Set(ITEMS.filter((i) => i.type === deck && distinct(i)).map((i) => i.back))]
     // prefer distractors from the enabled pool so choices stay in scope
-    const inScope = [...new Set(this.pool.filter((i) => i.back !== it.back).map((i) => i.back))]
+    const inScope = [...new Set(this.pool.filter(distinct).map((i) => i.back))]
     const source = inScope.length >= 3 ? inScope : others
     const picks = source.sort(() => Math.random() - 0.5).slice(0, 3)
     this.options = [...picks, it.back].sort(() => Math.random() - 0.5)
@@ -131,10 +131,6 @@ export class Quiz {
     if (!this.current || this.result) return
     this.picked = o
     this.answer(o === this.current.back)
-  }
-
-  reveal() {
-    if (this.kind === 'flip' && !this.result) this.flipped = true
   }
 
   // (Re)start whenever the deck or the enabled chapters change the pool. Call from an $effect.

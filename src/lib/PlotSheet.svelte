@@ -4,6 +4,7 @@
   import Celebration from './Celebration.svelte'
   import PlantSprite from './PlantSprite.svelte'
   import { ART } from './plants'
+  import { bloomName } from './blooms'
   import * as sfx from './sfx'
   import { app, growPlot, plantAt, poolFor, removePlant } from './store.svelte'
 
@@ -65,10 +66,11 @@
       {/each}
     {:else}
       <div class="hero">
-        <PlantSprite species={plot.species} stage={plot.stage} />
+        <PlantSprite species={plot.species} stage={plot.stage} variant={plot.variant} />
         {#if fx}{#key fx.id}<Celebration kind={fx.kind} color={ART[plot.species].bud} />{/key}{/if}
       </div>
       <h2>{SPECIES[plot.species].label}</h2>
+      {#if bloomed && plot.variant}<p class="variant">✨ {bloomName(plot.species, plot.variant)}</p>{/if}
       <p class="dim">{DECK_LABEL[plot.deck]} · {STAGE_NAMES[plot.stage]} ({plot.stage} of {BLOOMED})</p>
       <p class="dim">Watered {plot.waters}×{#if plot.grooms} · Groomed {plot.grooms}×{/if}</p>
 

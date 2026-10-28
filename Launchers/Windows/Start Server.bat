@@ -1,5 +1,6 @@
 @echo off
-cd /d "%~dp0"
+rem Launchers live in Launchers\Windows; run from the project root.
+cd /d "%~dp0..\.."
 
 rem Already running? Just open the browser.
 netstat -ano | findstr /R /C:":5173 .*LISTENING" >nul
