@@ -2,7 +2,7 @@
   import { ITEMS, type Item } from '../data/items'
   import pkg from '../../package.json'
   import { BLOOMED, PLOT_COUNT, STAGE_NAMES } from './garden'
-  import { app, debugFill, debugSetStage, debugSkipTime, exportData, importData, level, resetGarden, resetStats, save } from './store.svelte'
+  import { app, debugAddCoins, debugAntCoin, debugFill, debugSetStage, debugSkipTime, debugSproutWeed, exportData, importData, level, resetGarden, resetStats, save } from './store.svelte'
 
   const rows = $derived(
     ITEMS.map((it) => ({ it, s: app.stats[it.id] })).filter((r): r is { it: Item; s: NonNullable<typeof r.s> } => !!r.s),
@@ -126,6 +126,9 @@
     <div class="settings">
       <button onclick={() => debugSkipTime()}>Skip 20 hours</button>
       <button onclick={debugFill}>Fill empty plots</button>
+      <button onclick={debugSproutWeed}>Sprout a weed</button>
+      <button onclick={() => debugAddCoins()}>+100 coins</button>
+      <button onclick={debugAntCoin}>Next ant brings a coin</button>
       <label>Plot
         <select bind:value={dbgPlot}>
           {#each Array(PLOT_COUNT) as _, i}<option value={i + 1}>{i + 1}</option>{/each}

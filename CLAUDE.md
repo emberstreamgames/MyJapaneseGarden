@@ -31,6 +31,8 @@ A Japanese study app built around the Genki I textbook. There's flashcard practi
 | `src/lib/blooms.ts` | Bloom colour variants (gradients, patterns, metals) drawn over the `plants.ts` shapes. Each plot rolls `variant` when planted (0 = original); it only shows once bloomed |
 | `palettes.html`, `src/palette/` | Dev-only preview of every bloom variant (`/palettes.html` on the dev server; not in the build) |
 | `src/lib/meadow.ts`, `PlotTile.svelte` | Garden bed artwork (seeded, built once) and the 16 plot positions; each `PlotTile` draws its plant on its spot under a transparent button clipped to the soil (`hitClip`), so taps on the lawn do nothing; the painted plant and its badge are tappable too |
+| `WeedSprite.svelte`, `WeedPluck.svelte` | Weed art (3 kinds) and the pluck animation. Weeds sit on `WEED_SPOTS` in `meadow.ts`: lawn points clear of every plot's plant |
+| `Ants.svelte` | Ambient ants walking `ANT_LANES` (`meadow.ts`) while the garden is open; one may carry a coin. Its SVG layer matches the scene's box, bleed included |
 | `src/lib/sfx.ts` | Sounds generated with the Web Audio API (no audio files) |
 | `src/lib/Stats.svelte` | Stats and settings. Tap the version number 7 times to unlock the debug tools. |
 
@@ -41,7 +43,7 @@ A Japanese study app built around the Genki I textbook. There's flashcard practi
 - Sound callers check `app.muted` before calling `sfx.*`.
 - Item ids come from their content (`v-<jp>-<meaning>`, `n5-<jp>-<meaning>`, `j-<kanji>`, `g-<sentence>`, `h-`/`k-<kana>`), and stats are stored under them. Changing a row's prompt or main meaning resets its stats.
 - Typed answers are stored trimmed and lowercased. Grammar rows should include romaji alternatives.
-- Saved data: key `genki-study-v1`, `SAVE_VERSION = 2`. Loaded or imported garden data always goes through `normalizeGarden`. If the save shape changes, bump the version and migrate in `load()`/`importData()`.
+- Saved data: key `genki-study-v1`, `SAVE_VERSION = 3`. Loaded or imported garden data always goes through `normalizeGarden`. If the save shape changes, bump the version and migrate in `repair()` (used by both `load()` and `importData()`).
 - Code style: no semicolons, single quotes, 2-space indent, short comments that explain why.
 
 ## Game rules (quick reference)
@@ -49,6 +51,9 @@ A Japanese study app built around the Genki I textbook. There's flashcard practi
 - 16 plots and 10 species, two per deck. Stages run 1 (Seeded) to 7 (Bloomed). An empty plot is `null`.
 - Phases: `thirsty`, then a quiz is done, then `resting` (20 h `COOLDOWN_MS`), then `ready`, then tap to grow. A bloomed plant goes back to `thirsty` (groom) after each cooldown.
 - XP: 10 + 2×combo (capped at 10) for each correct answer, plus 50 for watering or 30 for grooming when a quiz is finished. A level is every 100 XP.
+- Coins: +10 for each growth stage, +5 for each weed. Spending 100 ends a resting plant's cooldown at once (`skipWait`).
+- Weeds: one every 2 h (`WEED_EVERY_MS`), at most 6, caught up from `weedAt` on load. Tapping one asks a single question from a random deck with items in the enabled chapters. A correct answer pulls it for 5 coins and 5 bonus XP; a wrong one leaves it and swaps in a new question.
+- Ants: a line of 1-3 crosses the lawn every 15-40 s while the garden is open, some carrying crumbs or food. Once `ANT_COIN_EVERY_MS` (1 h) has passed since the last ant coin was collected (`antCoinAt`), the next lead ant carries a coin; tapping it gives 5 coins. An untapped coin ant leaves the coin for a later ant. With reduced motion, only the coin ant shows, standing still.
 - A deck's plants unlock once it has at least `MIN_DECK_SIZE` (10) items.
 
 ## Current status (2026-10-27)

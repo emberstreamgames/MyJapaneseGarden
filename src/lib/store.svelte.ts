@@ -1,7 +1,12 @@
 import type { Lesson } from '../data/build'
 import { ITEMS, deckReady, type Deck, type Item } from '../data/items'
-import { BLOOMED, COOLDOWN_MS, PLOT_COUNT, SEEDED, SPECIES, advance, completeQuiz, completionBonus, normalizeGarden, plantSeed, type Plot, type Species } from './garden'
+import {
+  ANT_COINS, BLOOMED, COOLDOWN_MS, GROW_COINS, PLOT_COUNT, SEEDED, SKIP_COST, SPECIES, WEED_BONUS_XP, WEED_COINS, WEED_EVERY_MS,
+  advance, antCoinDue, completeQuiz, completionBonus, normalizeGarden, normalizeWeeds, plantSeed, skipRest, sproutWeeds,
+  type Plot, type Species, type Weed,
+} from './garden'
 import { rollVariant } from './blooms'
+import { WEED_SPOTS } from './meadow'
 
 export type Mode = 'mix' | 'choice' | 'type'
 
@@ -20,6 +25,10 @@ export interface Stat {
 interface Saved {
   version: number // save format version, for future migrations
   garden: (Plot | null)[] // PLOT_COUNT slots; null is an empty plot
+  weeds: Weed[]
+  weedAt: number // when the weed timer last ticked
+  coins: number
+  antCoinAt: number // when the last ant's coin was collected
   debug: boolean // hidden debug tools unlocked in Settings
   lessons: Lesson[] // enabled chips: Genki lessons and/or 'n5'
   stats: Record<string, Stat>
@@ -31,11 +40,16 @@ interface Saved {
 
 const KEY = 'genki-study-v1'
 
-const SAVE_VERSION = 2
+const SAVE_VERSION = 3 // 3: coins, weeds and ants
 
 const defaults = (): Saved => ({
   version: SAVE_VERSION,
   garden: normalizeGarden(null),
+  weeds: [],
+  // Start one interval back so a new (or pre-weed) save gets its first weed straight away.
+  weedAt: Date.now() - WEED_EVERY_MS,
+  coins: 0,
+  antCoinAt: 0, // the first ant brings one
   debug: false,
   lessons: [1, 2],
   stats: {},
@@ -45,15 +59,25 @@ const defaults = (): Saved => ({
   mode: 'mix',
 })
 
+const count = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0)
+
+// Make loaded or imported data safe. Fields missing from older saves already hold defaults.
+function repair(data: Saved): Saved {
+  data.garden = normalizeGarden(data.garden)
+  data.weeds = normalizeWeeds(data.weeds, WEED_SPOTS.length)
+  data.weedAt = typeof data.weedAt === 'number' && Number.isFinite(data.weedAt) ? data.weedAt : Date.now() - WEED_EVERY_MS
+  data.coins = count(data.coins)
+  data.antCoinAt = typeof data.antCoinAt === 'number' && Number.isFinite(data.antCoinAt) ? data.antCoinAt : 0
+  data.mode = normalizeMode(data.mode)
+  data.version = SAVE_VERSION
+  return data
+}
+
 function load(): Saved {
   try {
     const raw = localStorage.getItem(KEY)
     if (raw) {
-      const data = { ...defaults(), ...JSON.parse(raw) }
-      data.garden = normalizeGarden(data.garden)
-      data.mode = normalizeMode(data.mode)
-      data.version = SAVE_VERSION
-      return data
+      return repair({ ...defaults(), ...JSON.parse(raw) })
     }
   } catch {
     // storage unavailable or corrupt: start fresh
@@ -104,10 +128,7 @@ export function importData(text: string): boolean {
   try {
     const data = JSON.parse(text)
     if (typeof data !== 'object' || !data || typeof data.stats !== 'object') return false
-    Object.assign(app, defaults(), data)
-    app.garden = normalizeGarden(data.garden)
-    app.mode = normalizeMode(data.mode)
-    app.version = SAVE_VERSION
+    Object.assign(app, repair({ ...defaults(), ...data }))
     save()
     return true
   } catch {
@@ -149,6 +170,47 @@ export function growPlot(i: number, now = Date.now()): boolean {
   const next = plot && advance(plot, now)
   if (!next) return false
   app.garden[i] = next
+  app.coins += GROW_COINS
+  save()
+  return true
+}
+
+export function skipWait(i: number, now = Date.now()): boolean {
+  const plot = validSlot(i) ? app.garden[i] : null
+  const next = app.coins >= SKIP_COST && plot && skipRest(plot, now)
+  if (!next) return false
+  app.garden[i] = next
+  app.coins -= SKIP_COST
+  save()
+  return true
+}
+
+// Grow any weeds that are due. Safe to call often.
+export function tendWeeds(now = Date.now()) {
+  const { weeds, lastAt } = sproutWeeds(app.weeds, app.weedAt, now, WEED_SPOTS.length, Math.random)
+  if (lastAt === app.weedAt) return
+  app.weeds = weeds
+  app.weedAt = lastAt
+  save()
+}
+
+// Call once a weed's question is answered.
+export function pullWeed(spot: number): boolean {
+  const i = app.weeds.findIndex((w) => w.spot === spot)
+  if (i < 0) return false
+  app.weeds.splice(i, 1)
+  app.coins += WEED_COINS
+  app.xp += WEED_BONUS_XP
+  save()
+  return true
+}
+
+export const antCoinReady = (now = Date.now()) => antCoinDue(app.antCoinAt, now)
+
+export function collectAntCoin(now = Date.now()): boolean {
+  if (!antCoinDue(app.antCoinAt, now)) return false
+  app.coins += ANT_COINS
+  app.antCoinAt = now
   save()
   return true
 }
@@ -167,7 +229,23 @@ export function debugSkipTime(ms = COOLDOWN_MS) {
   app.garden.forEach((p) => {
     if (p?.doneAt != null) p.doneAt -= ms
   })
+  app.weedAt -= ms
   save()
+}
+
+export function debugAddCoins(n = SKIP_COST) {
+  app.coins += n
+  save()
+}
+
+export function debugAntCoin() {
+  app.antCoinAt = 0
+  save()
+}
+
+export function debugSproutWeed() {
+  app.weedAt = Math.min(app.weedAt, Date.now()) - WEED_EVERY_MS
+  tendWeeds()
 }
 
 export function debugSetStage(i: number, stage: number) {

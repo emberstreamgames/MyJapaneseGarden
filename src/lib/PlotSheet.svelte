@@ -1,12 +1,12 @@
 <script lang="ts">
   import { DECK_LABEL, deckReady, type Deck } from '../data/items'
-  import { BLOOMED, SPECIES, STAGE_NAMES, formatWait, msUntilReady, phaseOf, speciesFor } from './garden'
+  import { BLOOMED, GROW_COINS, SKIP_COST, SPECIES, STAGE_NAMES, formatWait, msUntilReady, phaseOf, speciesFor } from './garden'
   import Celebration from './Celebration.svelte'
   import PlantSprite from './PlantSprite.svelte'
   import { ART } from './plants'
   import { bloomName } from './blooms'
   import * as sfx from './sfx'
-  import { app, growPlot, plantAt, poolFor, removePlant } from './store.svelte'
+  import { app, growPlot, plantAt, poolFor, removePlant, skipWait } from './store.svelte'
 
   let { index, now, onClose, onStart }: { index: number; now: number; onClose: () => void; onStart: (i: number) => void } = $props()
 
@@ -27,6 +27,11 @@
     const kind = app.garden[index]?.stage === BLOOMED ? 'bloom' : 'grow'
     fx = { id: ++fxId, kind }
     if (!app.muted) (kind === 'bloom' ? sfx.bloom : sfx.grow)()
+  }
+
+  // Checked against the `now` the sheet shows, so the plant is ready for it straight after.
+  function skip() {
+    if (skipWait(index, now) && !app.muted) sfx.coin()
   }
 
   function remove() {
@@ -67,7 +72,7 @@
     {:else}
       <div class="hero">
         <PlantSprite species={plot.species} stage={plot.stage} variant={plot.variant} />
-        {#if fx}{#key fx.id}<Celebration kind={fx.kind} color={ART[plot.species].bud} />{/key}{/if}
+        {#if fx}{#key fx.id}<Celebration kind={fx.kind} color={ART[plot.species].bud} /><b class="coin-gain" aria-hidden="true">+{GROW_COINS} 🪙</b>{/key}{/if}
       </div>
       <h2>{SPECIES[plot.species].label}</h2>
       {#if bloomed && plot.variant}<p class="variant">✨ {bloomName(plot.species, plot.variant)}</p>{/if}
@@ -81,6 +86,8 @@
         {#if emptyPool}<p class="dim">No {DECK_LABEL[plot.deck]} in your pool. Turn on a chapter above.</p>{/if}
       {:else if phase === 'resting'}
         <p class="note">{bloomed ? 'Groomed' : 'Watered'}. {bloomed ? 'Ready to groom again' : 'Ready to grow'} in {formatWait(msUntilReady(plot, now))}.</p>
+        <button class="big-btn" disabled={app.coins < SKIP_COST} onclick={skip}>🪙 {SKIP_COST} · Skip the wait</button>
+        {#if app.coins < SKIP_COST}<p class="dim">You have {app.coins} coins. Grow plants and pull weeds to earn more.</p>{/if}
       {:else}
         <button class="hit big-btn" onclick={grow}>✨ Grow to next stage</button>
       {/if}

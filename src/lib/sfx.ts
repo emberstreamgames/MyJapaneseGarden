@@ -86,3 +86,31 @@ export function bloom() {
   ;[523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, i * 0.1, 0.3, 'triangle', 0.08))
   ;[523, 659, 784, 1047].forEach((f) => tone(f, 0.6, 0.8, 'sine', 0.06))
 }
+
+// A quick upward pop as a weed comes out of the ground, then a coin chime.
+export function pluck() {
+  if (!ready() || !ctx) return
+  const o = ctx.createOscillator()
+  const g = ctx.createGain()
+  const t = ctx.currentTime
+  o.type = 'triangle'
+  o.frequency.setValueAtTime(220, t)
+  o.frequency.exponentialRampToValueAtTime(880, t + 0.09)
+  g.gain.setValueAtTime(0.16, t)
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14)
+  o.connect(g).connect(ctx.destination)
+  o.start(t)
+  o.stop(t + 0.14)
+  coinAt(0.18)
+}
+
+// Two bright notes, for gaining or spending coins.
+export function coin() {
+  if (!ready()) return
+  coinAt(0)
+}
+
+function coinAt(start: number) {
+  tone(988, start, 0.08, 'square', 0.05)
+  tone(1319, start + 0.07, 0.25, 'square', 0.05)
+}

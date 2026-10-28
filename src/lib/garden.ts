@@ -15,6 +15,20 @@ export const QUIZ_LENGTH = 10
 export const WATER_BONUS_XP = 50
 export const GROOM_BONUS_XP = 30
 
+// Coins: earned by growing plants and pulling weeds, spent to skip a cooldown.
+export const GROW_COINS = 10
+export const WEED_COINS = 5
+export const WEED_BONUS_XP = 5
+export const SKIP_COST = 100
+
+// Once this long after the last one was collected, the next ant to cross the lawn carries a coin.
+export const ANT_COIN_EVERY_MS = 60 * 60 * 1000
+export const ANT_COINS = 5
+
+export const WEED_EVERY_MS = 2 * 60 * 60 * 1000
+export const MAX_WEEDS = 6
+export const WEED_KINDS = 3
+
 export interface SpeciesInfo {
   label: string
   deck: Deck
@@ -95,6 +109,47 @@ export function completeQuiz(plot: Plot, now: number): Plot | null {
 export function advance(plot: Plot, now: number): Plot | null {
   if (phaseOf(plot, now) !== 'ready') return null
   return { ...plot, stage: plot.stage + 1, doneAt: null }
+}
+
+// Paid with coins: end the cooldown now, as if it had run out.
+export function skipRest(plot: Plot, now: number): Plot | null {
+  if (phaseOf(plot, now) !== 'resting') return null
+  return { ...plot, doneAt: now - COOLDOWN_MS }
+}
+
+// A clock that moved back counts as due, like a cooldown.
+export const antCoinDue = (lastAt: number, now: number): boolean => now < lastAt || now - lastAt >= ANT_COIN_EVERY_MS
+
+// Weeds grow on the lawn around the bed, one per WEED_EVERY_MS, at a free spot (meadow.ts WEED_SPOTS).
+export interface Weed {
+  spot: number
+  kind: number // 0..WEED_KINDS-1, which weed art to draw
+}
+
+// Catch up on every weed due since `lastAt`. The clock keeps ticking while the lawn is full,
+// so pulling a weed doesn't make the next one appear at once.
+export function sproutWeeds(weeds: Weed[], lastAt: number, now: number, spots: number, rand: () => number) {
+  // A clock that moved back restarts the timer instead of stalling it.
+  if (now < lastAt) return { weeds, lastAt: now }
+  const due = Math.floor((now - lastAt) / WEED_EVERY_MS)
+  if (!due) return { weeds, lastAt }
+  const next = [...weeds]
+  for (let k = 0; k < due && next.length < Math.min(MAX_WEEDS, spots); k++) {
+    const free = Array.from({ length: spots }, (_, i) => i).filter((i) => !next.some((w) => w.spot === i))
+    next.push({ spot: free[Math.floor(rand() * free.length)], kind: Math.floor(rand() * WEED_KINDS) })
+  }
+  return { weeds: next, lastAt: lastAt + due * WEED_EVERY_MS }
+}
+
+export function normalizeWeeds(raw: unknown, spots: number): Weed[] {
+  const out: Weed[] = []
+  for (const w of Array.isArray(raw) ? raw : []) {
+    const spot = w?.spot, kind = w?.kind
+    if (!Number.isInteger(spot) || spot < 0 || spot >= spots || out.some((o) => o.spot === spot)) continue
+    out.push({ spot, kind: Number.isInteger(kind) && kind >= 0 && kind < WEED_KINDS ? kind : 0 })
+    if (out.length === MAX_WEEDS) break
+  }
+  return out
 }
 
 // Make loaded or imported data safe: right length, known species, sane numbers.

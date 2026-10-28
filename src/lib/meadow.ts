@@ -1,8 +1,11 @@
 // Static artwork for the garden: a lawn with a sunken bed of four tilled rows. Built once from a
 // fixed seed so it looks the same on every visit. Plants, holes and status live in PlotTile,
-// which places itself on SPOTS. Coordinates are in the 400x440 viewBox.
+// which places itself on SPOTS. Coordinates are in the 400x440 view (the lawn extends BLEED past it).
 
 export const VIEW = { w: 400, h: 440 }
+// Extra lawn drawn past each side of the view. The bed box stays VIEW-sized so plots and weeds keep
+// their positions; the CSS lets the wider picture bleed out (offscreen on phones).
+export const BLEED = 100
 
 // Ground point of each plot (row-major, 4 per row), where a plant's stem meets the soil.
 export const SPOTS = Array.from({ length: 16 }, (_, i) => ({ x: 87.5 + (i % 4) * 75, y: 90 + Math.floor(i / 4) * 84 }))
@@ -37,6 +40,42 @@ export function hitClip(i: number) {
 
 type Rand = () => number
 type Pt = [number, number]
+
+const STONES = [[16, 140, 9], [384, 296, 10], [374, 316, 6], [62, 424, 8]]
+
+// Ground points where weeds can grow: on the lawn, off the soil, and clear of every plot's plant
+// (even empty ones, which may be planted later), the stones and each other. Fixed, like the scene.
+export const WEED_SPOTS = (() => {
+  const r = rng(11)
+  const out: { x: number; y: number }[] = []
+  const offBed = (x: number, y: number) => ((x - BED.cx) / (BED.rx + 12)) ** 6 + ((y - BED.cy) / (BED.ry + 12)) ** 6 >= 1
+  const clearOfPlants = (x: number, y: number) => SPOTS.every((s) => Math.abs(x - s.x) > 34 || y - 24 > s.y + 12 || y < s.y - 80)
+  for (let k = 0; k < 4000 && out.length < 18; k++) {
+    const x = 14 + r() * 372, y = 26 + r() * 406
+    if (!offBed(x, y) || !clearOfPlants(x, y)) continue
+    if (STONES.some(([sx, sy]) => Math.hypot(x - sx, y - sy) < 20)) continue
+    if (out.some((p) => Math.hypot(x - p.x, y - p.y) < 30)) continue
+    out.push({ x: Math.round(x), y: Math.round(y) })
+  }
+  return out
+})()
+
+// Lawn lanes the ants follow (bed units), entering and leaving past the edge of the scene, bleed
+// included. They keep to the side and bottom strips: the top strip is under the first row's flowers.
+// The side lanes stay inside VIEW so they show on phones, where the bleed is offscreen.
+const L = -BLEED - 14, R = VIEW.w + BLEED + 14
+export const ANT_LANES: [number, number][][] = [
+  [[L, 421], [90, 415], [200, 425], [310, 417], [R, 422]],
+  [[16, -14], [20, 110], [13, 230], [19, 350], [14, 454]],
+  [[385, -14], [380, 120], [388, 240], [382, 360], [386, 454]],
+  [[16, -14], [18, 200], [22, 370], [60, 418], [200, 424], [R, 419]],
+  [[386, -14], [383, 220], [378, 380], [340, 420], [200, 426], [L, 420]],
+]
+
+// CSS box (percent of the bed) for a weed on `p`: 40 bed units square, so WeedSprite's 30-unit view
+// draws a third larger than the bed, with its ground point at (50%, 83.3%) of the box.
+export const weedBox = (p: { x: number; y: number }) =>
+  `left:${(((p.x - 20) / VIEW.w) * 100).toFixed(3)}%;top:${(((p.y - 33.3) / VIEW.h) * 100).toFixed(3)}%;width:${((40 / VIEW.w) * 100).toFixed(3)}%;height:${((40 / VIEW.h) * 100).toFixed(3)}%`
 
 function rng(seed: number): Rand {
   return () => {
@@ -79,7 +118,8 @@ function build() {
   const inBed = (x: number, y: number, pad = 0) => ((x - CX) / (RX + pad)) ** 6 + ((y - CY) / (RY + pad)) ** 6 < 1
   const bed = blob(r, CX, CY, RX, RY, 6, 3)
 
-  let s = `<svg class="scene" viewBox="0 0 ${VIEW.w} ${VIEW.h}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  const X0 = -BLEED, W = VIEW.w + BLEED * 2
+  let s = `<svg class="scene" viewBox="${X0} 0 ${W} ${VIEW.h}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
   <defs>
     <linearGradient id="bed-grass" x1="0" y1="0" x2="0.3" y2="1"><stop offset="0" stop-color="#6cbb4f"/><stop offset="1" stop-color="#4a973a"/></linearGradient>
     <radialGradient id="bed-soil" cx="0.45" cy="0.35" r="0.8"><stop offset="0" stop-color="#5a3b25"/><stop offset="1" stop-color="#3b2618"/></radialGradient>
@@ -90,25 +130,25 @@ function build() {
     <filter id="bed-blur" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="5"/></filter>
     <clipPath id="bed-clip"><path d="${bed}"/></clipPath>
   </defs>
-  <rect width="${VIEW.w}" height="${VIEW.h}" fill="url(#bed-grass)"/>`
+  <rect x="${X0}" width="${W}" height="${VIEW.h}" fill="url(#bed-grass)"/>`
 
   // Lawn: broad light/dark patches, then blades.
-  for (let i = 0; i < 22; i++)
-    s += `<ellipse cx="${f(r() * 400)}" cy="${f(r() * 440)}" rx="${f(30 + r() * 50)}" ry="${f(14 + r() * 24)}" fill="${r() < 0.5 ? '#3c8230' : '#8ad065'}" opacity="0.2"/>`
+  for (let i = 0; i < 33; i++)
+    s += `<ellipse cx="${f(X0 + r() * W)}" cy="${f(r() * 440)}" rx="${f(30 + r() * 50)}" ry="${f(14 + r() * 24)}" fill="${r() < 0.5 ? '#3c8230' : '#8ad065'}" opacity="0.2"/>`
   const greens = ['#3f8a32', '#4c9a3b', '#5aab45', '#6cbb4f', '#7fcb5e', '#93d86f']
   const blades: [number, string][] = []
-  for (let i = 0; i < 1500; i++) {
-    const x = r() * 404 - 2, y = r() * 450
+  for (let i = 0; i < 2250; i++) {
+    const x = X0 + r() * (W + 4) - 2, y = r() * 450
     if (!inBed(x, y, -6)) blades.push([y, blade(x, y, 4 + r() * 6, (r() - 0.5) * 6, 0.8 + r() * 0.7, pick(r, greens))])
   }
   s += byDepth(blades)
 
   // Clusters of tiny wildflowers and a few stones.
   const petals = ['#ffffff', '#fff3a8', '#ffd0e4', '#cfe0ff']
-  for (let k = 0; k < 8; k++) {
+  for (let k = 0; k < 12; k++) {
     let cx: number, cy: number
     do {
-      cx = 10 + r() * 380
+      cx = X0 + 10 + r() * (W - 20)
       cy = 10 + r() * 420
     } while (inBed(cx, cy, 16))
     const col = pick(r, petals)
@@ -122,7 +162,7 @@ function build() {
       s += `<circle cx="${f(x)}" cy="${f(y)}" r="1" fill="#f2b51c"/>`
     }
   }
-  for (const [x, y, w] of [[16, 140, 9], [384, 296, 10], [374, 316, 6], [62, 424, 8]])
+  for (const [x, y, w] of STONES)
     s += `<ellipse cx="${x + 1}" cy="${y + 3}" rx="${w}" ry="${f(w * 0.6)}" fill="#1f3d16" opacity="0.45"/><ellipse cx="${x}" cy="${y}" rx="${w}" ry="${f(w * 0.62)}" fill="#a39f92"/><ellipse cx="${f(x - w * 0.3)}" cy="${f(y - w * 0.2)}" rx="${f(w * 0.45)}" ry="${f(w * 0.25)}" fill="#cbc8bc"/>`
 
   // The bed: cast shadow, soil, a dark band where the far wall faces us, and loose crumbs.
@@ -172,7 +212,7 @@ function build() {
     }
   }
 
-  return s + `<rect width="${VIEW.w}" height="${VIEW.h}" fill="url(#bed-light)" pointer-events="none"/></svg>`
+  return s + `<rect x="${X0}" width="${W}" height="${VIEW.h}" fill="url(#bed-light)" pointer-events="none"/></svg>`
 }
 
 export const SCENE = build()
