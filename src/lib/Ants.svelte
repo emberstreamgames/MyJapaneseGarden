@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { flyCoinsFrom } from './coinfly.svelte'
   import { ANT_COINS } from './garden'
   import { ANT_LANES, BLEED, VIEW } from './meadow'
   import * as sfx from './sfx'
@@ -94,7 +95,8 @@
       el.style.transform = ant.mid
       return
     }
-    const a = el.animate(ant.keys, { duration: ant.duration, delay: ant.delay, fill: 'both' })
+    // Plain keyframes: Safari silently ignores a $state proxy, leaving the ant parked at the origin.
+    const a = el.animate($state.snapshot(ant.keys), { duration: ant.duration, delay: ant.delay, fill: 'both' })
     anims.set(ant.id, a)
     a.finished.then(() => drop(ant.id), () => {})
     return () => a.cancel()
@@ -107,7 +109,10 @@
     const bed = el.closest('.ants')!.getBoundingClientRect(), box = el.getBoundingClientRect()
     gain = { id: ++n, x: ((box.left + box.width / 2 - bed.left) / bed.width) * 100, y: ((box.top + box.height / 2 - bed.top) / bed.height) * 100 }
     ant.carry = null
-    if (collectAntCoin() && !app.muted) sfx.coin()
+    if (collectAntCoin()) {
+      if (!app.muted) sfx.coin()
+      flyCoinsFrom(el, ANT_COINS)
+    }
     // Lighter now, it scurries off. Without motion it simply leaves.
     const a = anims.get(ant.id)
     if (a) a.playbackRate = 2.5
@@ -117,7 +122,7 @@
 
 <!-- One SVG in bed units, so the keyframes' px are bed units at any size. It covers the scene's bleed too. -->
 <div class="ants">
-  <svg viewBox="{-BLEED} 0 {VIEW.w + BLEED * 2} {VIEW.h}" aria-hidden={!ants.some((a) => a.carry === 'coin')}>
+  <svg viewBox="{-BLEED} 0 {VIEW.w + BLEED * 2} {VIEW.h}" preserveAspectRatio="xMidYMid slice" aria-hidden={!ants.some((a) => a.carry === 'coin')}>
     {#each ants as ant (ant.id)}
       {@const coin = ant.carry === 'coin'}
       <!-- One element for the whole walk: dropping the coin must not restart the animation. -->

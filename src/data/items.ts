@@ -62,6 +62,8 @@ const combo: Row[] = [
 const toKatakana = (s: string) =>
   [...s].map((c) => String.fromCharCode(c.charCodeAt(0) + 0x60)).join('')
 
+// Kana keep the Genki lesson that teaches them (1 and 2) for reference, but the chapter chips
+// don't filter them: store.svelte.ts poolFor always includes every kana.
 function build(rows: Row[], tag: string): Item[] {
   const out: Item[] = []
   for (const [hira, romaji, ...alts] of rows) {

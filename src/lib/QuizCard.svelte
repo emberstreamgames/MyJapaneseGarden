@@ -1,6 +1,6 @@
 <script lang="ts">
   import { DECK_LABEL, DECK_PROMPT } from '../data/items'
-  import type { Quiz } from './quiz.svelte'
+  import { CHEERS, type Quiz } from './quiz.svelte'
 
   let { quiz, onNext, nextLabel = 'Next ▶' }: { quiz: Quiz; onNext: () => void; nextLabel?: string } = $props()
 
@@ -47,6 +47,19 @@
               {/each}
             </div>
           {/if}
+
+          {#if quiz.result === 'wrong'}
+            <p class="explain">
+              {#if quiz.deck === 'grammar'}
+                The missing word is <b>{current.back}</b>
+              {:else}
+                <span lang="ja">{current.front}</span>
+                {quiz.deck === 'hiragana' || quiz.deck === 'katakana' ? 'is read' : 'means'}
+                <b>“{current.back}”</b>
+              {/if}
+              {#if quiz.kind === 'type' && quiz.typed.trim()}<span class="dim">You typed “{quiz.typed.trim()}”.</span>{/if}
+            </p>
+          {/if}
         </div>
       {/key}
 
@@ -66,7 +79,12 @@
 
     {#if quiz.result}
       <div class="row">
-        <div class="verdict {quiz.result}">{quiz.result === 'right' ? 'Correct!' : 'Not quite'}</div>
+        {#if quiz.result === 'right'}
+          <div class="verdict right">Correct!</div>
+        {:else}
+          {@const c = CHEERS[quiz.cheer]}
+          <div class="verdict wrong">{c.en} <span lang="ja">{c.ja}</span><small>({c.gloss})</small></div>
+        {/if}
         <button class="primary" onclick={onNext}>{nextLabel}</button>
       </div>
     {/if}

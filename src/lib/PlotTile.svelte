@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { SPECIES, STAGE_NAMES, msUntilReady, formatWait, phaseOf, type Plot } from './garden'
+  import { COOLDOWN_MS, SPECIES, STAGE_NAMES, msUntilReady, formatWait, phaseOf, type Plot } from './garden'
   import { CELL, SPOTS, VIEW, hitClip } from './meadow'
   import PlantSprite from './PlantSprite.svelte'
   import { STEM_TOP } from './plants'
@@ -78,6 +78,17 @@
         <span class="badge" style={badgeAt} aria-hidden="true" {onclick}>{badge}</span>
       {/if}
     {/if}
+  {/if}
+  {#if plot && phase === 'resting'}
+    <!-- Countdown under the plant: fills up as the rest runs out. -->
+    {@const done = 1 - msUntilReady(plot, now) / COOLDOWN_MS}
+    <div class="ptimer" style="top:{pct(CELL.above + 7, CELL.h)}" aria-hidden="true">
+      <svg class="pclock" viewBox="-6 -6 12 12">
+        <circle r="5.2" fill="#fff" stroke="#3a3f66" stroke-width="1.2" />
+        <path d="M0 -3.2V0L2.2 1.4" fill="none" stroke="#3a3f66" stroke-width="1.1" stroke-linecap="round" />
+      </svg>
+      <span class="pbar"><i style="width:{(done * 100).toFixed(1)}%"></i></span>
+    </div>
   {/if}
   <button class="hit" style="clip-path:{clip}" aria-label={label} {onclick}></button>
 </div>

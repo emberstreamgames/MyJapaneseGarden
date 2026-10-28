@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { DECK_LABEL, type Deck } from '../data/items'
-  import { app, level } from './store.svelte'
+  import { DECK_LABEL, ITEMS, type Deck } from '../data/items'
+  import { app, holdLevelUps, level, levelProgress } from './store.svelte'
   import { Quiz } from './quiz.svelte'
   import QuizCard from './QuizCard.svelte'
 
@@ -10,7 +10,12 @@
 
   $effect(() => quiz.sync())
 
-  const pct = $derived(app.xp % 100)
+  const pct = $derived(levelProgress())
+
+  // A level-up waits until this card is done with, so it never covers an answer.
+  $effect(() => {
+    if (quiz.result) return holdLevelUps()
+  })
 </script>
 
 <section class="deck">
@@ -26,10 +31,10 @@
     <div class="empty">
       <h2>No {DECK_LABEL[deck]} in your pool</h2>
       <p>
-        {#if deck === 'kanji' || deck === 'vocab' || deck === 'grammar'}
-          {DECK_LABEL[deck]} content isn't loaded yet. It's coming once the textbook pages are added.
-        {:else}
+        {#if ITEMS.some((i) => i.type === deck)}
           Turn on a chapter above to add its {DECK_LABEL[deck]} to your pool.
+        {:else}
+          {DECK_LABEL[deck]} content isn't loaded yet. It's coming once the textbook pages are added.
         {/if}
       </p>
     </div>

@@ -1,17 +1,25 @@
 <script lang="ts">
-  import { untrack } from 'svelte'
+  import { tick, untrack } from 'svelte'
   import Ants from './Ants.svelte'
-  import type { Deck } from '../data/items'
+  import { flyCoins, inFlight } from './coinfly.svelte'
+  import Decor from './Decor.svelte'
+  import { DECOR, available } from './decor'
+  import { DECK_LABEL, type Deck } from '../data/items'
   import GardenQuiz from './GardenQuiz.svelte'
-  import { BLOOMED, WEED_BONUS_XP, completionBonus, formatWait, msUntilReady, phaseOf, type Weed } from './garden'
+  import { BLOOMED, WEED_BONUS_XP, WEED_COINS, WELCOME_AFTER_MS, completionBonus, formatWait, msUntilReady, phaseOf, type Weed } from './garden'
   import { SCENE, WEED_SPOTS, weedBox } from './meadow'
   import PlotSheet from './PlotSheet.svelte'
   import PlotTile from './PlotTile.svelte'
   import * as sfx from './sfx'
-  import { app, finishQuiz, level, poolFor, pullWeed, tendWeeds } from './store.svelte'
+  import { antCoinReady, app, finishQuiz, level, levelProgress, markSeen, poolFor, pullWeed, tendWeeds, type Preserved } from './store.svelte'
+  import { dayNumber, liveStreak, rainedDays } from './streak'
+  import Visitors from './Visitors.svelte'
+  import Welcome, { type Away } from './Welcome.svelte'
   import WaterSplash from './WaterSplash.svelte'
   import WeedPluck from './WeedPluck.svelte'
   import WeedSprite from './WeedSprite.svelte'
+
+  let { onPreserved, onShop }: { onPreserved: (p: Preserved) => void; onShop: (spot: number | null) => void } = $props()
 
   const DECKS: Deck[] = ['hiragana', 'katakana', 'kanji', 'vocab', 'grammar']
 
@@ -23,12 +31,21 @@
   let splash = $state<number | null>(null)
   let pulled: Weed | null = null // weed whose question was answered, plucked on return
   let pluck = $state<Weed | null>(null)
+  let away = $state<Away | null>(null)
+  let weedAsk = $state<{ w: Weed; deck: Deck } | null>(null) // the pre-screen before a weed's question
+  let earned = 0 // perfect and streak coins from the quiz just finished, flown in on return
 
   // Keep countdowns fresh and weeds growing, and catch up when the tab comes back to the foreground.
+  // After a long time away, say what happened meanwhile.
   $effect(() => {
     const tick = () => {
       now = Date.now()
+      const gone = app.seenAt ? now - app.seenAt : 0
+      const weedsBefore = app.weeds.length
       tendWeeds(now)
+      if (document.hidden) return
+      if (gone >= WELCOME_AFTER_MS && !quiz) away = summarize(app.weeds.length - weedsBefore)
+      markSeen(now)
     }
     untrack(tick)
     const t = setInterval(tick, 30_000)
@@ -48,7 +65,25 @@
     return waits.length ? Math.min(...waits) : null
   })
   const planted = $derived(app.garden.filter((p) => p).length)
-  const pct = $derived(app.xp % 100)
+  const unplaced = $derived(DECOR.some((d) => available(app.decor, d.id) > 0) && app.decor.placed.some((p) => !p))
+  const today = $derived(dayNumber(now))
+  const streak = $derived(liveStreak(app.streak, today))
+  const studiedToday = $derived(app.streak.day === today)
+
+  function summarize(sprouted: number): Away {
+    const phases = app.garden.flatMap((p) => (p ? [phaseOf(p, now)] : []))
+    return {
+      ready: phases.filter((ph) => ph === 'ready').length,
+      thirsty: phases.filter((ph) => ph === 'thirsty').length,
+      sprouted,
+      ant: antCoinReady(now),
+      streak: liveStreak(app.streak, today),
+      rained: rainedDays(app.streak, today),
+      studied: app.streak.day === today,
+      lost: app.streak.count > 0 && !liveStreak(app.streak, today),
+    }
+  }
+  const pct = $derived(levelProgress())
 
   function open(i: number) {
     now = Date.now()
@@ -63,11 +98,19 @@
     quiz = { target: i, deck: p.deck, mode: p.stage === BLOOMED ? 'groom' : 'water', bonus: completionBonus(p) }
   }
 
-  // A weed asks one question from any deck the enabled chapters cover.
-  function startWeed(w: Weed) {
+  // A weed asks one question from any deck the enabled chapters cover. The deck is picked first so
+  // the pre-screen can say what kind of question is coming.
+  function askWeed(w: Weed) {
     const decks = DECKS.filter((d) => poolFor(d).length)
+    weedAsk = { w, deck: decks[Math.floor(Math.random() * decks.length)] ?? 'hiragana' }
+  }
+
+  function startWeed() {
+    if (!weedAsk) return
+    const { w, deck } = weedAsk
+    weedAsk = null
     pulled = null
-    quiz = { target: w.spot, deck: decks[Math.floor(Math.random() * decks.length)] ?? 'hiragana', mode: 'weed', bonus: WEED_BONUS_XP }
+    quiz = { target: w.spot, deck, mode: 'weed', bonus: WEED_BONUS_XP }
   }
 
   function closeQuiz() {
@@ -77,38 +120,63 @@
     pluck = pulled
     watered = null
     pulled = null
+    const coins = earned
+    earned = 0
+    // The garden (and its coin counter) mounts on the next tick.
+    if (coins) tick().then(() => flyCoins(innerWidth / 2, innerHeight / 2, coins))
   }
 
-  function complete(target: number, mode: 'water' | 'groom' | 'weed') {
+  function complete(target: number, mode: 'water' | 'groom' | 'weed', right: number) {
     if (mode === 'weed') {
       const w = app.weeds.find((w) => w.spot === target)
       if (w && pullWeed(target)) pulled = { ...w }
-    } else if (finishQuiz(target) && mode === 'water') watered = target
+      return null
+    }
+    const reward = finishQuiz(target, right)
+    if (reward && mode === 'water') watered = target
+    earned = reward?.coins ?? 0
+    return reward
+  }
+
+  function onKey(e: KeyboardEvent) {
+    if (weedAsk && e.key === 'Escape') weedAsk = null
+  }
+
+  function preserved(p: Preserved) {
+    selected = null
+    onPreserved(p)
   }
 </script>
 
+<svelte:window onkeydown={onKey} />
+
 {#if quiz}
   {@const q = quiz}
-  <GardenQuiz deck={q.deck} mode={q.mode} bonus={q.bonus} onComplete={() => complete(q.target, q.mode)} onClose={closeQuiz} />
+  <GardenQuiz deck={q.deck} mode={q.mode} bonus={q.bonus} onComplete={(right) => complete(q.target, q.mode, right)} onClose={closeQuiz} />
 {:else}
   <section class="garden">
     <div class="hud">
       <div class="lvl">Lv {level()}</div>
       <div class="xpbar" aria-label="XP progress"><div style="width:{pct}%"></div></div>
-      <div class="coins" aria-label="{app.coins} coins">🪙 {app.coins}</div>
+      {#if streak}
+        <div class="streak" class:pending={!studiedToday} title={studiedToday ? `${streak}-day streak` : 'Water or groom a plant today to grow your streak'} aria-label="{streak}-day streak">🌱 {streak}</div>
+      {/if}
+      <div class="coins" data-coin-target aria-label="{app.coins} coins">🪙 {app.coins - inFlight.coins}</div>
     </div>
 
     <div class="bed">
       {@html SCENE}
+      <Decor {onShop} />
       {#each app.garden as plot, i (i)}
         <PlotTile {plot} index={i} {now} onclick={() => open(i)} />
       {/each}
       {#each app.weeds as w (w.spot)}
-        <button class="weed-tile" style={weedBox(WEED_SPOTS[w.spot])} aria-label="Weed, answer a question to pull it" onclick={() => startWeed(w)}>
+        <button class="weed-tile" style={weedBox(WEED_SPOTS[w.spot])} aria-label="Weed, answer a question to pull it" onclick={() => askWeed(w)}>
           <WeedSprite kind={w.kind} />
         </button>
       {/each}
       <Ants />
+      <Visitors />
       {#if pluck}
         {@const p = pluck}
         <WeedPluck spot={p.spot} kind={p.kind} onPop={() => !app.muted && sfx.pluck()} onDone={() => (pluck = null)} />
@@ -125,6 +193,8 @@
         {attention} {attention === 1 ? 'plant needs' : 'plants need'} you.
       {:else if app.weeds.length}
         {app.weeds.length === 1 ? 'A weed is' : `${app.weeds.length} weeds are`} creeping in. Tap to pull for coins.
+      {:else if unplaced}
+        You have decorations to place. Tap a <b>+</b> on the lawn.
       {:else if nextWait !== null}
         All resting. Next ready in {formatWait(nextWait)}.
       {/if}
@@ -132,6 +202,23 @@
   </section>
 
   {#if selected !== null}
-    <PlotSheet index={selected} {now} onClose={() => (selected = null)} onStart={startQuiz} />
+    <PlotSheet index={selected} {now} onClose={() => (selected = null)} onStart={startQuiz} onPreserved={preserved} />
+  {/if}
+  {#if weedAsk}
+    {@const a = weedAsk}
+    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+    <div class="backdrop" onclick={(e) => e.target === e.currentTarget && (weedAsk = null)}>
+      <div class="sheet weed-ask" role="dialog" aria-modal="true" aria-label="Pull the weeds">
+        <button class="x" aria-label="Close" onclick={() => (weedAsk = null)}>✕</button>
+        <div class="weed-ask-art"><WeedSprite kind={a.w.kind} /></div>
+        <h2>Pull the weeds!</h2>
+        <p>Answer a <b>{DECK_LABEL[a.deck]}</b> question to earn coins!</p>
+        <p class="coins">+{WEED_COINS} 🪙 · +{WEED_BONUS_XP} XP</p>
+        <button class="primary big-btn" onclick={startWeed}>Start</button>
+      </div>
+    </div>
+  {/if}
+  {#if away}
+    <Welcome {away} onClose={() => (away = null)} />
   {/if}
 {/if}

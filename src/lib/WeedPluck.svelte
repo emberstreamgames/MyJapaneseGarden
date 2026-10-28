@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { flyCoinsFrom } from './coinfly.svelte'
   import { WEED_COINS } from './garden'
   import { WEED_SPOTS, weedBox } from './meadow'
   import WeedSprite from './WeedSprite.svelte'
@@ -14,13 +15,17 @@
     return { dx: Math.cos(a) * d, dy: Math.sin(a) * d }
   })
 
-  function run(_: HTMLDivElement) {
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  function run(el: HTMLDivElement) {
+    const popped = () => {
       onPop()
+      flyCoinsFrom(el, WEED_COINS)
+    }
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      popped()
       const t = setTimeout(onDone, 900) // still show the reward
       return () => clearTimeout(t)
     }
-    const pop = setTimeout(onPop, POP)
+    const pop = setTimeout(popped, POP)
     const done = setTimeout(onDone, 1300)
     return () => {
       clearTimeout(pop)

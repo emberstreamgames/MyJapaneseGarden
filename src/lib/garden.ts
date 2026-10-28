@@ -14,6 +14,16 @@ export const BLOOMED = STAGE_NAMES.length - 1
 export const QUIZ_LENGTH = 10
 export const WATER_BONUS_XP = 50
 export const GROOM_BONUS_XP = 30
+// Extra coins for answering every question of a watering or grooming quiz right.
+export const PERFECT_COINS = 15
+
+// A bloomed plant groomed this many times can be preserved: dried, pressed and added to the collection.
+export const PRESERVE_GROOMS = 3
+export const PRESERVE_COINS = 25
+export const COMPLETE_COINS = 50 // extra, the first time a flower is preserved
+
+// After this long away, opening the garden shows a welcome-back card.
+export const WELCOME_AFTER_MS = 4 * 60 * 60 * 1000
 
 // Coins: earned by growing plants and pulling weeds, spent to skip a cooldown.
 export const GROW_COINS = 10
@@ -24,6 +34,10 @@ export const SKIP_COST = 100
 // Once this long after the last one was collected, the next ant to cross the lawn carries a coin.
 export const ANT_COIN_EVERY_MS = 60 * 60 * 1000
 export const ANT_COINS = 5
+
+// Once this long after the last visitor was thanked, a butterfly or bird lands in the garden with a word to review.
+export const VISITOR_EVERY_MS = 20 * 60 * 1000
+export const VISITOR_COINS = [1, 3] // inclusive range
 
 export const WEED_EVERY_MS = 2 * 60 * 60 * 1000
 export const MAX_WEEDS = 6
@@ -119,6 +133,11 @@ export function skipRest(plot: Plot, now: number): Plot | null {
 
 // A clock that moved back counts as due, like a cooldown.
 export const antCoinDue = (lastAt: number, now: number): boolean => now < lastAt || now - lastAt >= ANT_COIN_EVERY_MS
+export const visitorDue = (lastAt: number, now: number): boolean => now < lastAt || now - lastAt >= VISITOR_EVERY_MS
+// `r` is a random number in [0, 1).
+export const visitorCoins = (r: number) => VISITOR_COINS[0] + Math.floor(r * (VISITOR_COINS[1] - VISITOR_COINS[0] + 1))
+
+export const canPreserve = (plot: Plot): boolean => plot.stage === BLOOMED && plot.grooms >= PRESERVE_GROOMS
 
 // Weeds grow on the lawn around the bed, one per WEED_EVERY_MS, at a free spot (meadow.ts WEED_SPOTS).
 export interface Weed {

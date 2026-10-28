@@ -43,8 +43,13 @@ type Pt = [number, number]
 
 const STONES = [[16, 140, 9], [384, 296, 10], [374, 316, 6], [62, 424, 8]]
 
+// Ground points where decorations stand: the lawn's corners and the middle of each side, all inside
+// VIEW so they show on phones.
+export const DECOR_SPOTS = [{ x: 22, y: 70 }, { x: 378, y: 70 }, { x: 20, y: 236 }, { x: 380, y: 236 }, { x: 40, y: 434 }, { x: 360, y: 434 }]
+
 // Ground points where weeds can grow: on the lawn, off the soil, and clear of every plot's plant
-// (even empty ones, which may be planted later), the stones and each other. Fixed, like the scene.
+// (even empty ones, which may be planted later), the decoration spots, the stones and each other.
+// Fixed, like the scene.
 export const WEED_SPOTS = (() => {
   const r = rng(11)
   const out: { x: number; y: number }[] = []
@@ -54,6 +59,7 @@ export const WEED_SPOTS = (() => {
     const x = 14 + r() * 372, y = 26 + r() * 406
     if (!offBed(x, y) || !clearOfPlants(x, y)) continue
     if (STONES.some(([sx, sy]) => Math.hypot(x - sx, y - sy) < 20)) continue
+    if (DECOR_SPOTS.some((d) => Math.abs(x - d.x) < 34 && y > d.y - 50 && y < d.y + 32)) continue
     if (out.some((p) => Math.hypot(x - p.x, y - p.y) < 30)) continue
     out.push({ x: Math.round(x), y: Math.round(y) })
   }
@@ -76,6 +82,12 @@ export const ANT_LANES: [number, number][][] = [
 // draws a third larger than the bed, with its ground point at (50%, 83.3%) of the box.
 export const weedBox = (p: { x: number; y: number }) =>
   `left:${(((p.x - 20) / VIEW.w) * 100).toFixed(3)}%;top:${(((p.y - 33.3) / VIEW.h) * 100).toFixed(3)}%;width:${((40 / VIEW.w) * 100).toFixed(3)}%;height:${((40 / VIEW.h) * 100).toFixed(3)}%`
+
+// CSS box (percent of the bed) for a decoration on `p`: 52 bed units wide, drawing DecorSprite's
+// 40x44 view with its ground point (20, 42) on the spot.
+export const DECOR_SCALE = 1.3
+export const decorBox = (p: { x: number; y: number }) =>
+  `left:${(((p.x - 20 * DECOR_SCALE) / VIEW.w) * 100).toFixed(3)}%;top:${(((p.y - 42 * DECOR_SCALE) / VIEW.h) * 100).toFixed(3)}%;width:${((40 * DECOR_SCALE / VIEW.w) * 100).toFixed(3)}%;height:${((44 * DECOR_SCALE / VIEW.h) * 100).toFixed(3)}%`
 
 function rng(seed: number): Rand {
   return () => {
@@ -119,7 +131,7 @@ function build() {
   const bed = blob(r, CX, CY, RX, RY, 6, 3)
 
   const X0 = -BLEED, W = VIEW.w + BLEED * 2
-  let s = `<svg class="scene" viewBox="${X0} 0 ${W} ${VIEW.h}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  let s = `<svg class="scene" viewBox="${X0} 0 ${W} ${VIEW.h}" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
   <defs>
     <linearGradient id="bed-grass" x1="0" y1="0" x2="0.3" y2="1"><stop offset="0" stop-color="#6cbb4f"/><stop offset="1" stop-color="#4a973a"/></linearGradient>
     <radialGradient id="bed-soil" cx="0.45" cy="0.35" r="0.8"><stop offset="0" stop-color="#5a3b25"/><stop offset="1" stop-color="#3b2618"/></radialGradient>

@@ -97,6 +97,8 @@ const ROSE_GOLD = ['#9c5a55', '#ffd6cc', '#c98476', '#ffe9e2', '#a8655d']
 export const BLOOMS: Record<Species, Bloom[]> = {
   sakura: [
     { name: 'Snow Blush', look: (d) => ({ paints: [d.lin(['#ffffff', '#fff4f8', '#ffb3cc'])], center: '#ff4f87' }) },
+    { name: 'Kanzan', look: () => ({ paints: ['#ff8fb8'], center: '#d9466f' }) },
+    { name: 'Ukon', look: () => ({ paints: ['#eef2c4'], center: '#c9a227' }) },
   ],
   tulip: [
     { name: 'Sunny', look: () => ({ paints: ['#ffcc1f', '#ffe266', '#d18e00'] }) },
@@ -105,10 +107,14 @@ export const BLOOMS: Record<Species, Bloom[]> = {
     { name: 'Bubblegum Dots', look: (d) => ({ paints: [{ fill: '#ff6fa3', over: d.dots('#fff', 1.2, 5.5) }, '#ff9cc2', '#d6407a'] }) },
     { name: 'Sunset', look: (d) => ({ paints: [d.lin(['#ff3d6e', '#ff8a3d', '#ffd23f']), d.lin(['#ff7096', '#ffae6b', '#ffe480']), '#b8284e'] }) },
     { name: 'Rose Gold', look: (d) => ({ paints: [d.metal(ROSE_GOLD), '#ffe9e2aa', '#7a4440'], sparkle: '#fff0ea' }) },
+    { name: 'White Dream', look: () => ({ paints: ['#f4f1e8', '#ffffff', '#cfc9b8'] }) },
+    { name: 'Purple Prince', look: () => ({ paints: ['#a45bc9', '#c286e0', '#7a3a9e'] }) },
   ],
   sunflower: [
     { name: 'Ring of Fire', look: (d) => ({ paints: [d.lin(['#ffd23f', '#ff8a00', '#b22222']), d.lin(['#ffe480', '#ffa040', '#cf3a2a'])], center: '#3a1e0c' }) },
     { name: 'Pinwheel', look: () => ({ paints: [['#ffb800', '#ff6b35'], ['#ffd23f', '#ff9a5c']], center: '#6b3f1d' }) },
+    { name: 'Moulin Rouge', look: () => ({ paints: ['#8e1b1b', '#b0302a'], center: '#2a160a' }) },
+    { name: 'Italian White', look: () => ({ paints: ['#fff0bf', '#fff8dc'], center: '#3a2a1a' }) },
   ],
   marigold: [
     { name: 'Lemon Drop', look: () => ({ paints: ['#ffd400', '#ffe866'], center: '#e0b000' }) },
@@ -116,6 +122,8 @@ export const BLOOMS: Record<Species, Bloom[]> = {
     { name: 'Ruby', look: () => ({ paints: ['#c21f3a', '#e5486a'], center: '#7a0f22' }) },
     { name: 'Electric', look: () => ({ paints: ['#ff2bd6', '#ff8aec'], center: '#fffa65', glow: '#ff5ce6' }) },
     { name: 'Peach Fizz', look: (d) => ({ paints: [d.lin(['#ffd8c2', '#ff8a65']), d.lin(['#ffeee4', '#ffab91'])], center: '#ff7043' }) },
+    { name: 'Mahogany', look: () => ({ paints: ['#7d2a10', '#a63c18'], center: '#e8a000' }) },
+    { name: 'Bolero', look: () => ({ paints: ['#a63c18', '#ffb800'], center: '#d98a00' }) },
   ],
   lotus: [
     { name: 'Snow Lotus', look: (d) => ({ paints: [d.lin(['#ff8fb8', '#ffe1ec', '#ffffff']), d.lin(['#ffa3c6', '#fff0f5', '#ffffff']), d.lin(['#ffb8d2', '#ffffff'])] }) },
@@ -124,33 +132,45 @@ export const BLOOMS: Record<Species, Bloom[]> = {
     { name: 'Crimson Flame', look: (d) => ({ paints: [d.lin(['#ffd23f', '#ff5a36', '#a0122e']), d.lin(['#ffe066', '#ff7043', '#c21f3a']), d.lin(['#fff0a0', '#ff8a5c'])] }) },
     { name: 'Nebula', look: (d) => ({ paints: [{ fill: d.galaxy(), over: d.stars(), stroke: '#c9a6ff', sw: 0.7 }], glow: '#9d6bff' }) },
     { name: 'Crystal', look: () => ({ paints: [{ fill: '#a8eaff55', stroke: '#ffffff', sw: 0.8 }, { fill: '#c8f2ff66', stroke: '#ffffff', sw: 0.8 }, { fill: '#e8fbff88', stroke: '#ffffff', sw: 0.8 }], sparkle: '#ffffff', glow: '#bff4ff' }) },
+    { name: 'Yellow Lotus', look: () => ({ paints: ['#f2d65c', '#ffe680', '#fff3b8'] }) },
+    { name: 'Red Lotus', look: () => ({ paints: ['#d6336c', '#e8578a', '#f27aa5'] }) },
   ],
   iris: [
     { name: 'Snow Veil', look: (d) => ({ paints: [{ fill: '#ffffff', over: d.stripes('#7a5af0aa', 0.45, 1.6) }, '#efeafc'], center: '#ffc61a' }) },
     { name: 'Inkwork', look: (d) => ({ paints: [{ fill: '#c8b6ff', over: d.stripes('#3a1c8a', 0.55, 1.5) }, '#6a4ce0'], center: '#ffd23f' }) },
     { name: 'Sunset', look: (d) => ({ paints: [d.lin(['#ffb3c6', '#ff7a45']), d.lin(['#ff8fa3', '#c9184a'])], center: '#ffd23f' }) },
     { name: 'Black Velvet', look: () => ({ paints: [{ fill: '#2b1840', stroke: '#8a64c8', sw: 0.8 }, { fill: '#140a24', stroke: '#6a4c9c', sw: 0.8 }], center: '#ffd23f' }) },
+    { name: 'Yellow Flag', look: () => ({ paints: ['#ffd83d', '#f2b705'], center: '#a0522d' }) },
+    { name: 'Siberian Blue', look: () => ({ paints: ['#7fa8ff', '#3f6fd8'], center: '#ffd23f' }) },
   ],
   daisy: [
     { name: 'Gerbera', look: (d) => ({ paints: ['#e63946'], center: '#3b2a1b', centerOver: d.dots('#ffb703', 0.45, 2) }) },
     { name: 'Starry Night', look: (d) => ({ paints: [{ fill: '#1d2a5c', over: d.stars('#fff6c9'), stroke: '#9ab0ff', sw: 0.5 }], center: '#ffd23f', sparkle: '#fff6c9' }) },
+    { name: 'English Pink', look: () => ({ paints: ['#ffc2d6'], center: '#ffc61a' }) },
+    { name: 'Golden Marguerite', look: () => ({ paints: ['#ffd23f'], center: '#e09a00' }) },
   ],
   poppy: [
     { name: 'California', look: () => ({ paints: ['#ff7b00', '#ffa630'], center: '#3a2a0a' }) },
     { name: 'Black Blotch', look: (d) => ({ paints: [d.lin(['#d62839', '#d62839', '#c01f30', '#1a1a2e']), d.lin(['#ef476f', '#e03358', '#1a1a2e'])], center: '#0d0d18' }) },
     { name: 'Iceland', look: () => ({ paints: ['#ffe14d', '#fff3a3'], center: '#6a8a1f' }) },
+    { name: 'Shirley White', look: () => ({ paints: ['#f6f1ea', '#ffffff'], center: '#5a6b2a' }) },
+    { name: 'Mauve', look: () => ({ paints: ['#b07cc6', '#c99ad8'], center: '#2b2d42' }) },
   ],
   lavender: [
     { name: 'White', look: () => ({ paints: [['#f4f0ff', '#ffffff']] }) },
     { name: 'Pink', look: () => ({ paints: [['#ff8fc7', '#ffb3d9']] }) },
     // One colour per bud in LAVENDER_BUDS order, pale at the top.
     { name: 'Dusk Ombre', look: () => ({ paints: [['#efe6ff', '#d9c8ff', '#d9c8ff', '#b79cff', '#b79cff', '#9370f0', '#9370f0', '#6a3fd0', '#6a3fd0', '#5a2ea6']] }) },
+    { name: 'Hidcote', look: () => ({ paints: [['#5a3fa8', '#4a2f94']] }) },
+    { name: 'Munstead Blue', look: () => ({ paints: [['#8f9be8', '#7d8ad9']] }) },
   ],
   hydrangea: [
     { name: 'Limelight', look: () => ({ paints: [['#f1f7e6', '#e3f0cf', '#ffffff', '#d6eabb']] }) },
     // One colour per floret in HYDRANGEA_BLOOMS order, blue at the top.
     { name: 'Sky Ombre', look: () => ({ paints: [['#8fd0ff', '#9fb8ff', '#9fb8ff', '#b39cff', '#b39cff', '#a8b0ff', '#c08cf5', '#c08cf5', '#a46be8']] }) },
     { name: 'Galaxy', look: (d) => ({ paints: [{ fill: d.galaxy(), over: d.stars() }], glow: '#9d6bff' }) },
+    { name: 'Alkaline Pink', look: () => ({ paints: [['#f7a8c8', '#f28bb6', '#ffc2d9', '#e87aa8']] }) },
+    { name: 'Ruby Red', look: () => ({ paints: [['#c2185b', '#d63a75', '#a3134c', '#e05a8c']] }) },
   ],
 }
 

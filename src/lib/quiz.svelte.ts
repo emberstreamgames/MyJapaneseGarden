@@ -1,8 +1,17 @@
 import { ITEMS, type Deck, type Item } from '../data/items'
-import { app, level, poolFor, record, save } from './store.svelte'
+import { app, poolFor, record, save } from './store.svelte'
 import * as sfx from './sfx'
 
 export type Kind = 'choice' | 'type'
+
+// Said after a wrong answer, with any Japanese glossed so it can be read at any level.
+export const CHEERS = [
+  { en: 'Almost!', ja: 'がんばって', gloss: 'ganbatte: “hang in there”' },
+  { en: 'Not quite.', ja: 'ドンマイ', gloss: 'donmai: “don’t worry about it”' },
+  { en: 'So close!', ja: 'だいじょうぶ', gloss: 'daijōbu: “it’s okay”' },
+  { en: 'Keep going!', ja: 'もういちど', gloss: 'mō ichido: “one more time”' },
+  { en: 'Nice try!', ja: 'ファイト', gloss: 'faito: “you can do it”' },
+]
 
 // The question/answer engine shared by free practice and the garden quizzes.
 export class Quiz {
@@ -13,11 +22,13 @@ export class Quiz {
   result = $state<null | 'right' | 'wrong'>(null)
   picked = $state('')
   combo = $state(0)
+  bestCombo = $state(0) // best combo since this quiz was created
   session = $state({ right: 0, wrong: 0 })
   burst = $state<{ id: number; parts: { dx: number; dy: number; hue: number }[] } | null>(null)
   gain = $state<{ id: number; amount: number } | null>(null)
   shake = $state(0)
   answered = $state(0) // questions answered since this quiz was created
+  cheer = $state(0) // index into CHEERS for the last wrong answer
 
   private deckOf: () => Deck
   private lastId = ''
@@ -90,12 +101,12 @@ export class Quiz {
     if (!this.current || this.result) return
     this.result = ok ? 'right' : 'wrong'
     this.answered++
-    const prevLevel = level()
     record(this.current.id, ok)
     if (ok) {
       this.combo++
       this.session.right++
       if (this.combo > app.best) app.best = this.combo
+      if (this.combo > this.bestCombo) this.bestCombo = this.combo
       const amount = 10 + Math.min(this.combo, 10) * 2
       app.xp += amount
       this.gain = { id: ++this.n, amount }
@@ -108,12 +119,14 @@ export class Quiz {
           return { dx: Math.cos(a) * d, dy: Math.sin(a) * d, hue: (200 + i * 25 + combo * 12) % 360 }
         }),
       }
-      if (level() > prevLevel) sfx.levelUp()
-      else if (!app.muted) sfx.good(this.combo)
+      // A level-up has its own popup and sound (LevelUp.svelte).
+      if (!app.muted) sfx.good(this.combo)
     } else {
       this.combo = 0
       this.session.wrong++
       this.shake = ++this.n
+      // A different one each time.
+      this.cheer = (this.cheer + 1 + Math.floor(Math.random() * (CHEERS.length - 1))) % CHEERS.length
       if (!app.muted) sfx.bad()
     }
     save()

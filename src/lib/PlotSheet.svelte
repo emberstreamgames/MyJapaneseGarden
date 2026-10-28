@@ -1,14 +1,21 @@
 <script lang="ts">
   import { DECK_LABEL, deckReady, type Deck } from '../data/items'
-  import { BLOOMED, GROW_COINS, SKIP_COST, SPECIES, STAGE_NAMES, formatWait, msUntilReady, phaseOf, speciesFor } from './garden'
+  import { BLOOMED, GROW_COINS, PRESERVE_GROOMS, SKIP_COST, SPECIES, STAGE_NAMES, canPreserve, formatWait, msUntilReady, phaseOf, speciesFor } from './garden'
   import Celebration from './Celebration.svelte'
+  import { flyCoinsFrom } from './coinfly.svelte'
   import PlantSprite from './PlantSprite.svelte'
   import { ART } from './plants'
   import { bloomName } from './blooms'
   import * as sfx from './sfx'
-  import { app, growPlot, plantAt, poolFor, removePlant, skipWait } from './store.svelte'
+  import { app, growPlot, plantAt, poolFor, preservePlant, removePlant, skipWait, type Preserved } from './store.svelte'
 
-  let { index, now, onClose, onStart }: { index: number; now: number; onClose: () => void; onStart: (i: number) => void } = $props()
+  let {
+    index,
+    now,
+    onClose,
+    onStart,
+    onPreserved,
+  }: { index: number; now: number; onClose: () => void; onStart: (i: number) => void; onPreserved: (p: Preserved) => void } = $props()
 
   const DECKS: Deck[] = ['hiragana', 'katakana', 'kanji', 'vocab', 'grammar']
   // A deck can be planted once it has enough quiz content.
@@ -19,14 +26,26 @@
   const bloomed = $derived(plot?.stage === BLOOMED)
   const emptyPool = $derived(plot ? poolFor(plot.deck).length === 0 : false)
 
-  let fx = $state<{ id: number; kind: 'grow' | 'bloom' } | null>(null)
+  let fx = $state<{ id: number; kind: 'grow' | 'bloom'; found: boolean } | null>(null)
   let fxId = 0
+  let hero = $state<HTMLElement>()
 
   function grow() {
-    if (!growPlot(index)) return
+    const grown = growPlot(index)
+    if (!grown) return
     const kind = app.garden[index]?.stage === BLOOMED ? 'bloom' : 'grow'
-    fx = { id: ++fxId, kind }
-    if (!app.muted) (kind === 'bloom' ? sfx.bloom : sfx.grow)()
+    fx = { id: ++fxId, kind, found: grown.found }
+    flyCoinsFrom(hero, GROW_COINS)
+    if (!app.muted) {
+      ;(kind === 'bloom' ? sfx.bloom : sfx.grow)()
+      if (grown.found) setTimeout(sfx.fanfare, 1300)
+    }
+  }
+
+  function preserve() {
+    if (!confirm('Dry this flower and press it into your collection? Its plot will be free to plant again.')) return
+    const p = preservePlant(index)
+    if (p) onPreserved(p)
   }
 
   // Checked against the `now` the sheet shows, so the plant is ready for it straight after.
@@ -70,10 +89,11 @@
         </div>
       {/each}
     {:else}
-      <div class="hero">
+      <div class="hero" bind:this={hero}>
         <PlantSprite species={plot.species} stage={plot.stage} variant={plot.variant} />
         {#if fx}{#key fx.id}<Celebration kind={fx.kind} color={ART[plot.species].bud} /><b class="coin-gain" aria-hidden="true">+{GROW_COINS} 🪙</b>{/key}{/if}
       </div>
+      {#if fx?.found}<p class="discovery">✨ New discovery! Added to your collection</p>{/if}
       <h2>{SPECIES[plot.species].label}</h2>
       {#if bloomed && plot.variant}<p class="variant">✨ {bloomName(plot.species, plot.variant)}</p>{/if}
       <p class="dim">{DECK_LABEL[plot.deck]} · {STAGE_NAMES[plot.stage]} ({plot.stage} of {BLOOMED})</p>
@@ -90,6 +110,14 @@
         {#if app.coins < SKIP_COST}<p class="dim">You have {app.coins} coins. Grow plants and pull weeds to earn more.</p>{/if}
       {:else}
         <button class="hit big-btn" onclick={grow}>✨ Grow to next stage</button>
+      {/if}
+
+      {#if bloomed}
+        {#if canPreserve(plot)}
+          <button class="preserve big-btn" onclick={preserve}>🌸 Preserve · dry and press it</button>
+        {:else}
+          <p class="dim pgroom">Groom {PRESERVE_GROOMS - plot.grooms} more {PRESERVE_GROOMS - plot.grooms === 1 ? 'time' : 'times'} to preserve this flower for your collection.</p>
+        {/if}
       {/if}
 
       <button class="danger remove" onclick={remove}>Remove plant</button>

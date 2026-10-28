@@ -1,8 +1,13 @@
 <script lang="ts">
-  import { ITEMS, type Item } from '../data/items'
+  import { DECK_LABEL, ITEMS, type Deck, type Item } from '../data/items'
   import pkg from '../../package.json'
   import { BLOOMED, PLOT_COUNT, STAGE_NAMES } from './garden'
-  import { app, debugAddCoins, debugAntCoin, debugFill, debugSetStage, debugSkipTime, debugSproutWeed, exportData, importData, level, resetGarden, resetStats, save } from './store.svelte'
+  import { FLOWERS } from './collection'
+  import {
+    app, debugAddCoins, debugAntCoin, debugFill, debugPreservable, debugSetStage, debugSkipTime, debugSproutWeed, debugStreakDay, debugVisitor,
+    MASTERY_STREAK, exportData, importData, level, poolFor, resetGarden, resetStats, save,
+  } from './store.svelte'
+  import { dayNumber, liveStreak } from './streak'
 
   const rows = $derived(
     ITEMS.map((it) => ({ it, s: app.stats[it.id] })).filter((r): r is { it: Item; s: NonNullable<typeof r.s> } => !!r.s),
@@ -19,6 +24,24 @@
   const blooms = $derived(plants.filter((p) => p.stage === BLOOMED).length)
   const waters = $derived(plants.reduce((a, p) => a + p.waters, 0))
   const grooms = $derived(plants.reduce((a, p) => a + p.grooms, 0))
+  const streak = $derived(liveStreak(app.streak, dayNumber(Date.now())))
+  const found = $derived(FLOWERS.filter((f) => app.collection[f.key]).length)
+  const done = $derived(FLOWERS.filter((f) => app.collection[f.key]?.pressed).length)
+
+  // Mastery per deck, over the cards in the pool (every kana; vocab and kanji from the enabled chapters).
+  const DECKS: Deck[] = ['hiragana', 'katakana', 'kanji', 'vocab', 'grammar']
+  const R = 26
+  const mastery = $derived(
+    DECKS.flatMap((d) => {
+      const pool = poolFor(d)
+      if (!pool.length) return []
+      const done = pool.filter((i) => (app.stats[i.id]?.streak ?? 0) >= MASTERY_STREAK).length
+      const f = done / pool.length
+      // The leaf rides the tip of the ring, from the top round clockwise.
+      const a = f * 2 * Math.PI - Math.PI / 2
+      return [{ d, done, total: pool.length, f, leaf: { x: 32 + Math.cos(a) * R, y: 32 + Math.sin(a) * R, deg: (f * 360) } }]
+    }),
+  )
 
   let msg = $state('')
 
@@ -84,6 +107,32 @@
     <div><b>{waters}</b><span>waterings</span></div>
     <div><b>{grooms}</b><span>groomings</span></div>
   </div>
+  <div class="tiles">
+    <div><b>🌱 {streak}</b><span>day streak</span></div>
+    <div><b>{app.streak.best}</b><span>best streak</span></div>
+    <div><b>{found}/{FLOWERS.length}</b><span>discovered</span></div>
+    <div><b>{done}/{FLOWERS.length}</b><span>completed</span></div>
+  </div>
+
+  <h3>Mastery</h3>
+  <p class="dim">A card is mastered after {MASTERY_STREAK} right answers in a row. Each ring counts the cards in your review pool.</p>
+  <div class="rings">
+    {#each mastery as m (m.d)}
+      <div class="ring-tile" class:full={m.done === m.total}>
+        <svg class="mring" viewBox="0 0 64 64" role="img" aria-label="{DECK_LABEL[m.d]}: {m.done} of {m.total} mastered">
+          <circle class="track" cx="32" cy="32" r={R} />
+          {#if m.done}<circle class="fill" cx="32" cy="32" r={R} pathLength="100" stroke-dasharray="{m.f * 100} 100" transform="rotate(-90 32 32)" />{/if}
+          <g transform="translate({m.leaf.x.toFixed(2)} {m.leaf.y.toFixed(2)}) rotate({m.leaf.deg.toFixed(1)})">
+            <path class="leaf" d="M0 0C-1.6-2.6-1.2-6.2 2.6-8C3.4-4.6 2.6-1.6 0 0Z" />
+            <path d="M0 0L1.9-6.4" stroke="#2e6b26" stroke-width="0.5" fill="none" />
+          </g>
+          <text x="32" y="35.5">{m.done === m.total ? '🌸' : `${Math.floor(m.f * 100)}%`}</text>
+        </svg>
+        <b>{m.done}/{m.total}</b>
+        <span>{DECK_LABEL[m.d]} mastered</span>
+      </div>
+    {/each}
+  </div>
 
   <div class="lists">
     <div>
@@ -129,6 +178,8 @@
       <button onclick={debugSproutWeed}>Sprout a weed</button>
       <button onclick={() => debugAddCoins()}>+100 coins</button>
       <button onclick={debugAntCoin}>Next ant brings a coin</button>
+      <button onclick={debugVisitor}>Visitor now</button>
+      <button onclick={debugStreakDay}>Streak: last study a day earlier</button>
       <label>Plot
         <select bind:value={dbgPlot}>
           {#each Array(PLOT_COUNT) as _, i}<option value={i + 1}>{i + 1}</option>{/each}
@@ -140,6 +191,7 @@
         </select>
       </label>
       <button onclick={() => debugSetStage(dbgPlot - 1, dbgStage)}>Set stage</button>
+      <button onclick={() => debugPreservable(dbgPlot - 1)}>Make preservable</button>
     </div>
   {/if}
 
