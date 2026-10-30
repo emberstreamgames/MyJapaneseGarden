@@ -154,7 +154,7 @@ export function record(id: string, correct: boolean) {
   save()
 }
 
-export const XP_PER_LEVEL = 400
+export const XP_PER_LEVEL = 1200
 
 export const level = () => Math.floor(app.xp / XP_PER_LEVEL) + 1
 // Percent of the way to the next level.

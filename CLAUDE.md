@@ -58,7 +58,7 @@ A Japanese study app built around the Genki I textbook. There's flashcard practi
 
 - 16 plots and 10 species, two per deck. Stages run 1 (Seeded) to 7 (Bloomed). An empty plot is `null`.
 - Phases: `thirsty`, then a quiz is done, then `resting` (20 h `COOLDOWN_MS`, shown as a filling bar with a clock under the plant), then `ready`, then tap to grow. A bloomed plant goes back to `thirsty` (groom) after each cooldown.
-- XP: 10 + 2×combo (capped at 10) for each correct answer, plus 50 for watering or 30 for grooming when a quiz is finished. A level is every 400 XP (`XP_PER_LEVEL`).
+- XP: 10 + 2×combo (capped at 10) for each correct answer, plus 50 for watering or 30 for grooming when a quiz is finished. A level is every 1200 XP (`XP_PER_LEVEL`).
 - Coins: +10 for each growth stage, +5 for each weed. Spending 100 ends a resting plant's cooldown at once (`skipWait`).
 - Weeds: one every 2 h (`WEED_EVERY_MS`), at most 6, caught up from `weedAt` on load. Tapping one shows a pre-screen naming the question's deck (Start or ✕), then asks a single question from that deck, picked at random among decks with items in the pool. A correct answer pulls it for 5 coins and 5 bonus XP; a wrong one leaves it and swaps in a new question.
 - Chapters: the chips choose which lessons' vocab, kanji and grammar are in the pool. Hiragana and katakana are always fully in it (`poolFor`).
