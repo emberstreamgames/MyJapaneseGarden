@@ -7,36 +7,23 @@ export const VIEW = { w: 400, h: 440 }
 // their positions; the CSS lets the wider picture bleed out (offscreen on phones).
 export const BLEED = 100
 
-// Ground point of each plot (row-major, 4 per row), where a plant's stem meets the soil.
-export const SPOTS = Array.from({ length: 16 }, (_, i) => ({ x: 87.5 + (i % 4) * 75, y: 90 + Math.floor(i / 4) * 84 }))
+// The bed has four rows of 3, 2, 3 and 2 plots, so each plant stands between the two in front of it
+// rather than behind one. That lets the rows sit close and the plants draw GROW times the size they
+// had in the old 4x4 bed.
+const ROWS = [3, 2, 3, 2]
+export const GROW = 1.2
+export const PLANT_SCALE = 0.9 * GROW // of the 100-unit plant sprite
+const COL = 100, ROW_GAP = 80, FIRST_Y = 105
+const ROW_Y = ROWS.map((_, r) => FIRST_Y + r * ROW_GAP)
+// Ground point of each plot (row by row), where a plant's stem meets the soil.
+export const SPOTS = ROWS.flatMap((n, r) => Array.from({ length: n }, (_, c) => ({ x: 200 + (c - (n - 1) / 2) * COL, y: ROW_Y[r] })))
 // Size of one plot's box, and how far it reaches above its ground point.
-export const CELL = { w: 75, h: 84, above: 66 }
+export const CELL = { w: COL, h: 103, above: 79 }
+// The tap pad over a plot's soil: an ellipse just below the ground point. Pads sit above every
+// plant, so a tap on the soil picks that plot even where a plant from the row in front reaches up.
+export const PAD = { rx: 42, ry: 17 * GROW, dy: 2 * GROW }
 // The soil: a superellipse (n = 6) centred in the scene.
 const BED = { cx: 200, cy: 222, rx: 166, ry: 182 }
-// The drawn outline wobbles by up to 3 units, so taps stop a little inside it.
-const inSoil = (x: number, y: number) => ((x - BED.cx) / (BED.rx - 5)) ** 6 + ((y - BED.cy) / (BED.ry - 5)) ** 6 < 1
-
-// CSS clip-path that trims plot i's box to the soil, so taps on the lawn don't count. Both shapes
-// are convex, so a ray from the box centre stays inside until it leaves: binary-search where.
-export function hitClip(i: number) {
-  const s = SPOTS[i], hw = CELL.w / 2, hh = CELL.h / 2
-  const cx = s.x, cy = s.y - CELL.above + hh
-  const corners = [Math.atan2(hh, hw), Math.atan2(hh, -hw), Math.atan2(-hh, -hw), Math.atan2(-hh, hw)]
-  const angles = Array.from({ length: 48 }, (_, k) => (k / 48) * 2 * Math.PI - Math.PI).concat(corners).sort((a, b) => a - b)
-  const pts = angles.map((a) => {
-    const dx = Math.cos(a), dy = Math.sin(a)
-    let lo = 0, hi = Math.min(Math.abs(dx) > 1e-9 ? hw / Math.abs(dx) : Infinity, Math.abs(dy) > 1e-9 ? hh / Math.abs(dy) : Infinity)
-    if (inSoil(cx + dx * hi, cy + dy * hi)) lo = hi
-    else
-      for (let k = 0; k < 20; k++) {
-        const m = (lo + hi) / 2
-        if (inSoil(cx + dx * m, cy + dy * m)) lo = m
-        else hi = m
-      }
-    return `${(((dx * lo + hw) / CELL.w) * 100).toFixed(2)}% ${(((dy * lo + hh) / CELL.h) * 100).toFixed(2)}%`
-  })
-  return `polygon(${pts.join(',')})`
-}
 
 type Rand = () => number
 type Pt = [number, number]
@@ -54,7 +41,7 @@ export const WEED_SPOTS = (() => {
   const r = rng(11)
   const out: { x: number; y: number }[] = []
   const offBed = (x: number, y: number) => ((x - BED.cx) / (BED.rx + 12)) ** 6 + ((y - BED.cy) / (BED.ry + 12)) ** 6 >= 1
-  const clearOfPlants = (x: number, y: number) => SPOTS.every((s) => Math.abs(x - s.x) > 34 || y - 24 > s.y + 12 || y < s.y - 80)
+  const clearOfPlants = (x: number, y: number) => SPOTS.every((s) => Math.abs(x - s.x) > 34 * GROW || y - 24 > s.y + 12 || y < s.y - 80 * GROW)
   for (let k = 0; k < 4000 && out.length < 18; k++) {
     const x = 14 + r() * 372, y = 26 + r() * 406
     if (!offBed(x, y) || !clearOfPlants(x, y)) continue
@@ -208,19 +195,20 @@ function build() {
   }
   s += byDepth(fringe)
 
-  // Four tilled rows with grooves and clods. Holes and plants come from PlotTile.
-  for (let i = 0; i < 4; i++) {
-    const y0 = SPOTS[i * 4].y - 30, cy = y0 + 29
-    s += `<path d="${blob(r, CX, cy + 7, 152, 27, 7, 1.5)}" fill="#20140b" opacity="0.6"/>`
-    s += `<path d="${blob(r, CX, cy, 150, 28, 7, 1.5)}" fill="url(#bed-mound)"/>`
+  // A tilled row under each row of plots, with grooves and clods. Holes and plants come from PlotTile.
+  for (const y of ROW_Y) {
+    const y0 = y - 30 * GROW, cy = y - 1, ry = 28 * GROW
+    s += `<path d="${blob(r, CX, cy + 7, 152, ry - 1, 7, 1.5)}" fill="#20140b" opacity="0.6"/>`
+    s += `<path d="${blob(r, CX, cy, 150, ry, 7, 1.5)}" fill="url(#bed-mound)"/>`
     for (const [dy, op] of [[10, 0.55], [22, 0.3], [35, 0.3], [47, 0.4]]) {
-      let d = `M${CX - 138} ${y0 + dy}`
-      for (let x = CX - 115; x <= CX + 138; x += 23) d += `Q${f(x - 11.5)} ${f(y0 + dy + (r() - 0.5) * 3)} ${x} ${f(y0 + dy + (r() - 0.5) * 1.5)}`
+      const gy = y0 + dy * GROW
+      let d = `M${CX - 138} ${f(gy)}`
+      for (let x = CX - 115; x <= CX + 138; x += 23) d += `Q${f(x - 11.5)} ${f(gy + (r() - 0.5) * 3)} ${x} ${f(gy + (r() - 0.5) * 1.5)}`
       s += `<path d="${d}" fill="none" stroke="${dy === 10 ? '#b6875c' : '#462c1a'}" stroke-width="${dy === 10 ? 2.2 : 1.2}" stroke-linecap="round" opacity="${op}"/>`
     }
     for (let k = 0; k < 48; k++) {
       const light = r() < 0.55, rr = 0.8 + r() * 2
-      s += `<ellipse cx="${f(CX - 140 + r() * 280)}" cy="${f(y0 + 6 + r() * 46)}" rx="${f(rr * 1.3)}" ry="${f(rr)}" fill="${light ? '#a87a50' : '#4a301d'}" opacity="${light ? 0.8 : 0.6}"/>`
+      s += `<ellipse cx="${f(CX - 140 + r() * 280)}" cy="${f(y0 + (6 + r() * 46) * GROW)}" rx="${f(rr * 1.3)}" ry="${f(rr)}" fill="${light ? '#a87a50' : '#4a301d'}" opacity="${light ? 0.8 : 0.6}"/>`
     }
   }
 

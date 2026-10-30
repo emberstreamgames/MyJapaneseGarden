@@ -3,7 +3,7 @@ import { BLOOMS } from './blooms'
 
 // Pure garden rules. No store or DOM access, so every function here is easy to check and to time-travel.
 
-export const PLOT_COUNT = 16
+export const PLOT_COUNT = 10
 export const COOLDOWN_MS = 20 * 60 * 60 * 1000
 
 // Stage 0 (empty plot) is represented by a null slot, so a Plot's stage is 1..7.
@@ -172,9 +172,9 @@ export function normalizeWeeds(raw: unknown, spots: number): Weed[] {
 }
 
 // Make loaded or imported data safe: right length, known species, sane numbers.
-export function normalizeGarden(raw: unknown): (Plot | null)[] {
+export function normalizeGarden(raw: unknown, length = PLOT_COUNT): (Plot | null)[] {
   const src = Array.isArray(raw) ? raw : []
-  return Array.from({ length: PLOT_COUNT }, (_, i) => {
+  return Array.from({ length }, (_, i) => {
     const p = src[i]
     if (!p || typeof p !== 'object' || !(p.species in SPECIES)) return null
     const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0)
@@ -189,4 +189,14 @@ export function normalizeGarden(raw: unknown): (Plot | null)[] {
       variant: Math.min(BLOOMS[species].length, num(p.variant)), // older saves have none: original colours
     }
   })
+}
+
+// Saves from before version 7 had 16 plots. Keep the most-grown plants (by stage, then quizzes
+// done) in their old order, and return the ones that no longer fit.
+export function shrinkGarden(raw: unknown): { garden: (Plot | null)[]; extra: Plot[] } {
+  const all = normalizeGarden(raw, Array.isArray(raw) ? raw.length : 0).filter((p): p is Plot => !!p)
+  const growth = (p: Plot) => p.stage * 1000 + p.waters + p.grooms
+  const keep = new Set([...all].sort((a, b) => growth(b) - growth(a)).slice(0, PLOT_COUNT))
+  const kept = all.filter((p) => keep.has(p))
+  return { garden: Array.from({ length: PLOT_COUNT }, (_, i) => kept[i] ?? null), extra: all.filter((p) => !keep.has(p)) }
 }

@@ -4,7 +4,7 @@ import { ITEMS, deckReady, type Deck, type Item } from '../data/items'
 import {
   ANT_COINS, BLOOMED, COMPLETE_COINS, COOLDOWN_MS, GROW_COINS, PERFECT_COINS, PLOT_COUNT, PRESERVE_COINS, PRESERVE_GROOMS, QUIZ_LENGTH,
   SEEDED, SKIP_COST, SPECIES, WEED_BONUS_XP, WEED_COINS, WEED_EVERY_MS,
-  advance, antCoinDue, canPreserve, completeQuiz, completionBonus, normalizeGarden, normalizeWeeds, plantSeed, skipRest, sproutWeeds,
+  advance, antCoinDue, canPreserve, completeQuiz, completionBonus, normalizeGarden, normalizeWeeds, plantSeed, shrinkGarden, skipRest, sproutWeeds,
   VISITOR_COINS, visitorDue, type Plot, type Species, type Weed,
 } from './garden'
 import { rollVariant } from './blooms'
@@ -52,7 +52,7 @@ interface Saved {
 
 const KEY = 'genki-study-v1'
 
-const SAVE_VERSION = 6 // 3: coins, weeds and ants. 4: streak, collection, visitors. 5: decorations. 6: tutorial
+const SAVE_VERSION = 7 // 3: coins, weeds and ants. 4: streak, collection, visitors. 5: decorations. 6: tutorial. 7: 10 plots
 
 const defaults = (): Saved => ({
   version: SAVE_VERSION,
@@ -82,7 +82,10 @@ const count = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v 
 
 // Make loaded or imported data safe. Fields missing from older saves already hold defaults.
 function repair(data: Saved): Saved {
-  data.garden = normalizeGarden(data.garden)
+  // Version 7 cut the garden from 16 plots to 10. The plants that don't fit are settled below.
+  const old = data.version < 7 || (Array.isArray(data.garden) && data.garden.length > PLOT_COUNT)
+  const shrunk = old ? shrinkGarden(data.garden) : { garden: normalizeGarden(data.garden), extra: [] }
+  data.garden = shrunk.garden
   data.weeds = normalizeWeeds(data.weeds, WEED_SPOTS.length)
   data.weedAt = typeof data.weedAt === 'number' && Number.isFinite(data.weedAt) ? data.weedAt : Date.now() - WEED_EVERY_MS
   data.coins = count(data.coins)
@@ -93,6 +96,11 @@ function repair(data: Saved): Saved {
   // Saves from before the collection already have flowers in bloom: count them as discovered.
   let found = normalizeCollection(data.collection)
   for (const p of data.garden) if (p?.stage === BLOOMED) found = discover(found, p.species, p.variant, Date.now())
+  // A bloom that no longer fits is pressed into the collection; a younger plant pays back its growth coins.
+  for (const p of shrunk.extra) {
+    if (p.stage === BLOOMED) found = press(found, p.species, p.variant, Date.now())
+    else data.coins += GROW_COINS * p.stage
+  }
   data.collection = found
   data.decor = normalizeDecor(data.decor, DECOR_SPOTS.length)
   data.mode = normalizeMode(data.mode)

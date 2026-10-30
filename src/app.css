@@ -204,14 +204,17 @@ input:focus { outline: none; border-color: var(--accent); }
 /* garden */
 .ver { text-align: center; margin-top: 24px; }
 .linkish { background: none; border: none; color: var(--dim); padding: 4px 8px; font-size: 0.8rem; }
-/* The bed is one static picture (meadow.ts) with a transparent button over each plot's soil. */
+/* The bed is one static picture (meadow.ts) with a transparent oval button over each plot's soil.
+   The buttons sit above every plant, so the soil wins over a plant reaching up from the row in front. */
 .bed { position: relative; max-width: 480px; margin: 0 auto; aspect-ratio: 400 / 440; }
 /* The lawn is up to 1.5x the bed's width (BLEED in meadow.ts) and spills past it, but only as far as
    the screen edge. The SVGs slice, so a narrower box crops the lawn's sides rather than shrinking the bed. */
 .bed { --bleed: min(25%, (100vw - 100%) / 2); }
 .bed .scene { position: absolute; top: 0; left: calc(-1 * var(--bleed)); display: block; width: calc(100% + 2 * var(--bleed)); height: 100%; border-radius: 20px; box-shadow: 0 18px 40px -16px #000c; }
+/* Its own stacking layer, so the soil pads' z-index stays among the plots, under weeds and visitors. */
+.plots { position: absolute; inset: 0; isolation: isolate; pointer-events: none; }
 .plot { position: absolute; pointer-events: none; }
-.plot .hit { position: absolute; inset: 0; padding: 0; background: none; border: none; border-radius: 0; outline: none; pointer-events: auto; }
+.plot .hit { position: absolute; z-index: 2; padding: 0; background: none; border: none; border-radius: 50%; outline: none; pointer-events: auto; }
 .plot .ground, .plot .art { position: absolute; overflow: visible; }
 .plot .ring { fill: none; stroke: #fff; stroke-width: 1.5; opacity: 0; transition: opacity 0.15s; }
 .plot .art .plant { pointer-events: visiblePainted; cursor: pointer; } /* only the painted shapes, not the empty box */
@@ -220,9 +223,9 @@ input:focus { outline: none; border-color: var(--accent); }
 .plot:has(.hit:focus-visible) .ring { opacity: 1; stroke: var(--gold); stroke-width: 2.5; }
 .plot .glow { display: none; fill: url(#bed-glow); }
 .plot.ready .glow { display: inline; animation: glow 1.6s ease-in-out infinite; }
-.plot .badge { position: absolute; transform: translate(-50%, -50%); padding: 4px 5px; border-radius: 999px; background: #1c1e30e6; border: 1px solid #ffffff30; box-shadow: 0 2px 6px #0006; font-size: 0.8rem; line-height: 1; pointer-events: auto; cursor: pointer; }
+.plot .badge { position: absolute; transform: translate(-50%, -50%); padding: 4px 5px; border-radius: 999px; background: #1c1e30e6; border: 1px solid #ffffff30; box-shadow: 0 2px 6px #0006; font-size: 0.8rem; line-height: 1; pointer-events: auto; cursor: pointer; z-index: 3; }
 .plot.thirsty .badge { animation: bob 2s ease-in-out infinite; }
-.plot .zzz { position: absolute; width: 22px; height: 26px; transform: translate(-50%, -60%); pointer-events: auto; cursor: pointer; }
+.plot .zzz { position: absolute; width: 22px; height: 26px; transform: translate(-50%, -60%); pointer-events: auto; cursor: pointer; z-index: 3; }
 .plot .zzz i { position: absolute; left: 2px; bottom: 0; font: italic 800 0.8rem/1 system-ui, sans-serif; color: #e8eaff; text-shadow: 0 1px 3px #000a; opacity: 0; animation: zzz 3s ease-out infinite; }
 .plot .zzz i:nth-child(2) { animation-delay: 1s; }
 .plot .zzz i:nth-child(3) { animation-delay: 2s; }

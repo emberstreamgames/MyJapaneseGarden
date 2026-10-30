@@ -51,10 +51,10 @@
     plant: {
       title: 'Plant a seed',
       text: 'Tap an empty plot and pick a flower. Each flower grows from a different kind of question.',
-      // A plot near the middle, if it's free.
+      // The middle plot of the third row, if it's free.
       target: () => {
         const plots = document.querySelectorAll('.bed .plot')
-        return plots[5]?.classList.contains('empty') ? plots[5] : document.querySelector('.bed .plot.empty')
+        return plots[6]?.classList.contains('empty') ? plots[6] : document.querySelector('.bed .plot.empty')
       },
     },
     shop: {

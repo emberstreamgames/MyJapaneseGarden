@@ -1,20 +1,20 @@
 <script lang="ts">
   import { COOLDOWN_MS, SPECIES, STAGE_NAMES, msUntilReady, formatWait, phaseOf, type Plot } from './garden'
-  import { CELL, SPOTS, VIEW, hitClip } from './meadow'
+  import { CELL, GROW, PAD, PLANT_SCALE, SPOTS, VIEW } from './meadow'
   import PlantSprite from './PlantSprite.svelte'
   import { STEM_TOP } from './plants'
 
   let { plot, index, now, onclick }: { plot: Plot | null; index: number; now: number; onclick: () => void } = $props()
 
-  // Plants are drawn at 90% of their 100-unit sprite. The art box is sprite-sized, with the
+  // Plants are drawn at PLANT_SCALE of their 100-unit sprite. The art box is sprite-sized, with the
   // sprite's ground point (50, 86) on this plot's spot; the ground layer uses bed units around it.
-  const S = 0.9
+  const S = PLANT_SCALE
   const pct = (n: number, of: number) => `${((n / of) * 100).toFixed(3)}%`
   const artBox = `left:${pct(CELL.w / 2 - 50 * S, CELL.w)};top:${pct(CELL.above - 86 * S, CELL.h)};width:${pct(100 * S, CELL.w)};height:${pct(100 * S, CELL.h)}`
   const groundView = `${-50 * S} ${(-86 * S).toFixed(1)} ${100 * S} ${100 * S}`
 
   const spot = $derived(SPOTS[index])
-  const clip = $derived(hitClip(index))
+  const padBox = `left:${pct(CELL.w / 2 - PAD.rx, CELL.w)};top:${pct(CELL.above + PAD.dy - PAD.ry, CELL.h)};width:${pct(PAD.rx * 2, CELL.w)};height:${pct(PAD.ry * 2, CELL.h)}`
   const place = $derived(
     `left:${pct(spot.x - CELL.w / 2, VIEW.w)};top:${pct(spot.y - CELL.above, VIEW.h)};width:${pct(CELL.w, VIEW.w)};height:${pct(CELL.h, VIEW.h)}`,
   )
@@ -45,23 +45,26 @@
   )
 </script>
 
-<!-- The art overflows onto the lawn, so only the button (clipped to the soil) takes taps. -->
+<!-- The art overflows its box, so only the painted plant, its badge and the soil pad take taps. -->
 <div class="plot {phase ?? 'empty'}" style={place}>
   <svg class="ground" style={artBox} viewBox={groundView} aria-hidden="true">
-    <ellipse class="glow" rx="28" ry="10" />
-    <ellipse class="ring" cy="0.5" rx="20" ry="7.5" />
-    {#if plot}
-      <ellipse cy="2" rx="17" ry="5.5" fill="#2e1d11" opacity="0.45" />
-      <ellipse rx="13" ry="4.2" fill="#6a4529" />
-      <ellipse cx="-3" cy="-1" rx="6" ry="1.6" fill="#8e6340" />
-    {:else}
-      <ellipse cy="1.6" rx="13" ry="5.6" fill="#b0845a" opacity="0.85" />
-      <ellipse rx="12" ry="4.8" fill="#2a1a0f" />
-      <ellipse cy="1" rx="8" ry="2.8" fill="#170d07" />
-      <circle cx="15" cy="-2" r="1.4" fill="#a3774d" />
-      <circle cx="-16" cy="1" r="1" fill="#a3774d" />
-      <circle cx="11" cy="5" r="0.9" fill="#a3774d" />
-    {/if}
+    <g transform="scale({GROW})">
+      <ellipse class="glow" rx="28" ry="10" />
+      <!-- Outlines the tap pad (PAD) on hover and focus. -->
+      <ellipse class="ring" cy={PAD.dy / GROW} rx={PAD.rx / GROW} ry={PAD.ry / GROW} />
+      {#if plot}
+        <ellipse cy="2" rx="17" ry="5.5" fill="#2e1d11" opacity="0.45" />
+        <ellipse rx="13" ry="4.2" fill="#6a4529" />
+        <ellipse cx="-3" cy="-1" rx="6" ry="1.6" fill="#8e6340" />
+      {:else}
+        <ellipse cy="1.6" rx="13" ry="5.6" fill="#b0845a" opacity="0.85" />
+        <ellipse rx="12" ry="4.8" fill="#2a1a0f" />
+        <ellipse cy="1" rx="8" ry="2.8" fill="#170d07" />
+        <circle cx="15" cy="-2" r="1.4" fill="#a3774d" />
+        <circle cx="-16" cy="1" r="1" fill="#a3774d" />
+        <circle cx="11" cy="5" r="0.9" fill="#a3774d" />
+      {/if}
+    </g>
   </svg>
   {#if plot}
     <!-- Taps on the painted plant or its badge count too; the button below covers keyboard use. -->
@@ -82,7 +85,7 @@
   {#if plot && phase === 'resting'}
     <!-- Countdown under the plant: fills up as the rest runs out. -->
     {@const done = 1 - msUntilReady(plot, now) / COOLDOWN_MS}
-    <div class="ptimer" style="top:{pct(CELL.above + 7, CELL.h)}" aria-hidden="true">
+    <div class="ptimer" style="top:{pct(CELL.above + 7 * GROW, CELL.h)}" aria-hidden="true">
       <svg class="pclock" viewBox="-6 -6 12 12">
         <circle r="5.2" fill="#fff" stroke="#3a3f66" stroke-width="1.2" />
         <path d="M0 -3.2V0L2.2 1.4" fill="none" stroke="#3a3f66" stroke-width="1.1" stroke-linecap="round" />
@@ -90,5 +93,5 @@
       <span class="pbar"><i style="width:{(done * 100).toFixed(1)}%"></i></span>
     </div>
   {/if}
-  <button class="hit" style="clip-path:{clip}" aria-label={label} {onclick}></button>
+  <button class="hit" style={padBox} aria-label={label} {onclick}></button>
 </div>

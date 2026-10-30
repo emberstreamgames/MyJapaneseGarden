@@ -177,9 +177,11 @@
     <div class="bed">
       {@html SCENE}
       <Decor {onShop} />
-      {#each app.garden as plot, i (i)}
-        <PlotTile {plot} index={i} {now} onclick={() => open(i)} />
-      {/each}
+      <div class="plots">
+        {#each app.garden as plot, i (i)}
+          <PlotTile {plot} index={i} {now} onclick={() => open(i)} />
+        {/each}
+      </div>
       {#each app.weeds as w (w.spot)}
         <button class="weed-tile" style={weedBox(WEED_SPOTS[w.spot])} aria-label="Weed, answer a question to pull it" onclick={() => askWeed(w)}>
           <WeedSprite kind={w.kind} />

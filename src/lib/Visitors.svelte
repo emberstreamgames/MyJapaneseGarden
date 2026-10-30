@@ -3,7 +3,7 @@
   import type { Item } from '../data/items'
   import { flyCoinsFrom } from './coinfly.svelte'
   import { BLOOMED, visitorCoins } from './garden'
-  import { BLEED, SPOTS, VIEW, WEED_SPOTS } from './meadow'
+  import { BLEED, PLANT_SCALE, SPOTS, VIEW, WEED_SPOTS } from './meadow'
   import { STEM_TOP } from './plants'
   import * as sfx from './sfx'
   import { app, collectVisitor, reminderItem, tourDid, visitorReady } from './store.svelte'
@@ -58,8 +58,8 @@
     return { x: p.x, y: p.y - 2 }
   }
 
-  // The top of a flower head on plot i (plants are drawn at 90% with their ground on the spot).
-  const flowerTop = (i: number): Pt => ({ x: SPOTS[i].x + rand(-3, 3), y: SPOTS[i].y - (86 - STEM_TOP[BLOOMED]) * 0.9 - 4 })
+  // The top of a flower head on plot i (plants are drawn at PLANT_SCALE with their ground on the spot).
+  const flowerTop = (i: number): Pt => ({ x: SPOTS[i].x + rand(-3, 3), y: SPOTS[i].y - (86 - STEM_TOP[BLOOMED]) * PLANT_SCALE - 4 })
 
   function spawn() {
     // During the tutorial, visitors wait for their own step.
