@@ -2,24 +2,28 @@
   import { DECK_LABEL, type Deck } from '../data/items'
   import Celebration from './Celebration.svelte'
   import ConfirmSheet from './ConfirmSheet.svelte'
-  import { PERFECT_COINS, QUIZ_LENGTH } from './garden'
+  import { PERFECT_COINS, QUIZ_LENGTH, REVIEW_MAX, type Plot } from './garden'
+  import PlantSprite from './PlantSprite.svelte'
   import { STREAK_RAIN_EVERY } from './streak'
   import { Quiz } from './quiz.svelte'
   import QuizCard from './QuizCard.svelte'
   import * as sfx from './sfx'
-  import { app, holdLevelUps, level, type QuizReward } from './store.svelte'
+  import { app, holdLevelUps, level, quizState, type QuizReward } from './store.svelte'
 
   // A fixed-length quiz for watering or grooming a plant: answering all 10 questions is the only
-  // requirement. A weed needs one correct answer; a miss swaps in a new question.
+  // requirement. Its misses are then asked once more, for practice only. A weed needs one correct
+  // answer; a miss swaps in a new question.
   let {
     deck,
     mode,
+    plot = null,
     bonus,
     onComplete,
     onClose,
   }: {
     deck: Deck
     mode: 'water' | 'groom' | 'weed'
+    plot?: Plot | null // the plant being tended, shown in the summary
     bonus: number // completion XP, shown in the summary
     onComplete: (right: number) => QuizReward | null // fires once, when the last question is answered
     onClose: () => void // leave the quiz (after the summary, or via Quit)
@@ -27,18 +31,27 @@
 
   const quiz = new Quiz(() => deck)
   const length = $derived(mode === 'weed' ? 1 : QUIZ_LENGTH)
-  const verb = $derived(mode === 'weed' ? 'Weeding' : mode === 'groom' ? 'Grooming' : 'Watering')
   const progress = $derived(mode === 'weed' ? quiz.session.right : quiz.answered)
+  // The dots count the review round once it starts.
+  const dots = $derived(quiz.reviewing ? { n: quiz.reviewTotal, at: quiz.reviewDone } : { n: length, at: progress })
 
   let finished = $state(false) // all questions answered and credited
   let summary = $state(false)
   let leveled = $state(false) // the completion bonus pushed the player up a level
   let reward = $state<QuizReward | null>(null)
   let quitting = $state(false) // asking whether to give up on the plant
+  const verb = $derived(quiz.reviewing && !summary ? 'Reviewing' : mode === 'weed' ? 'Weeding' : mode === 'groom' ? 'Grooming' : 'Watering')
 
   $effect(() => quiz.sync())
   // Level-ups are celebrated once the quiz is over.
   $effect(() => holdLevelUps())
+  // The pool mustn't change mid-quiz: App hides the chapter chips while this is set.
+  $effect(() => {
+    quizState.open = true
+    return () => {
+      quizState.open = false
+    }
+  })
 
   $effect(() => {
     if (!finished && progress >= length) {
@@ -49,23 +62,35 @@
     }
   })
 
-  function next() {
-    // A weed has no summary: the garden plays the pluck instead.
-    if (finished && mode === 'weed') {
-      onClose()
-    } else if (finished) {
-      summary = true
-      if (!app.muted) {
-        if (mode === 'groom') sfx.groom()
-        else sfx.water()
-        if (reward?.perfect || reward?.study.bonus) setTimeout(sfx.fanfare, 900)
-      }
-    } else quiz.next()
+  function showSummary() {
+    summary = true
+    if (!app.muted) {
+      if (mode === 'groom') sfx.groom()
+      else sfx.water()
+      if (reward?.perfect || reward?.study.bonus) setTimeout(sfx.fanfare, 900)
+    }
   }
 
+  function next() {
+    // A weed has no summary: the garden plays the pluck instead.
+    if (finished && mode === 'weed') onClose()
+    else if (quiz.reviewing) quiz.reviewLeft ? quiz.next() : showSummary()
+    else if (finished) quiz.missed.length ? quiz.beginReview() : showSummary()
+    else quiz.next()
+  }
+
+  const nextLabel = $derived.by(() => {
+    if (mode === 'weed') return finished ? 'Pull it 🌿' : 'Try another ▶'
+    if (quiz.reviewing) return quiz.reviewLeft ? 'Next ▶' : 'Finish ✓'
+    if (!finished) return 'Next ▶'
+    return quiz.missed.length ? `Review ${Math.min(quiz.missed.length, REVIEW_MAX)} missed ▶` : 'Finish ✓'
+  })
+
   function quit() {
+    // The plant is already credited, so leaving the review only skips to the summary.
+    if (quiz.reviewing && !summary) showSummary()
     // Leaving a weed loses nothing: it stays on the lawn.
-    if (finished || mode === 'weed' || quiz.answered === 0) onClose()
+    else if (finished || mode === 'weed' || quiz.answered === 0) onClose()
     else quitting = true
   }
 </script>
@@ -74,17 +99,20 @@
   <div class="hud">
     <div class="lvl">{verb}</div>
     {#if mode !== 'weed'}<div class="combo gq" class:hot={quiz.combo >= 3} class:cold={quiz.combo < 2} title="Combo: right answers in a row" aria-label="Combo {quiz.combo}">🔥 {quiz.combo}</div>{/if}
-    <div class="dots" role="progressbar" aria-valuemin="0" aria-valuemax={length} aria-valuenow={Math.min(progress, length)} aria-label="Quiz progress">
-      {#each Array(length) as _, i}
-        <i class:done={i < progress} class:now={i === progress && !finished}></i>
+    <div class="dots" role="progressbar" aria-valuemin="0" aria-valuemax={dots.n} aria-valuenow={Math.min(dots.at, dots.n)} aria-label="Quiz progress">
+      {#each Array(dots.n) as _, i}
+        <i class:done={i < dots.at} class:now={i === dots.at && (quiz.reviewing || !finished)}></i>
       {/each}
     </div>
-    <button class="quit" onclick={quit}>{finished ? 'Close' : 'Quit'}</button>
+    <button class="quit" onclick={quit}>{quiz.reviewing && !summary ? 'Skip' : finished ? 'Close' : 'Quit'}</button>
   </div>
 
   {#if summary}
-    <div class="empty summary fxwrap">
-      <Celebration kind={mode === 'groom' ? 'groom' : 'water'} />
+    <div class="empty summary">
+      <div class="sum-plant fxwrap">
+        {#if plot}<PlantSprite species={plot.species} stage={plot.stage} variant={plot.variant} />{/if}
+        <Celebration kind={mode === 'groom' ? 'groom' : 'water'} />
+      </div>
       <h2>{mode === 'groom' ? 'Groomed!' : 'Watered!'}</h2>
       {#if reward?.perfect}
         <p class="perfect">🌟 Perfect! Every answer right</p>
@@ -96,6 +124,17 @@
       {#if reward?.perfect}<p class="coins">+{PERFECT_COINS} 🪙 perfect bonus</p>{/if}
       {#if reward}{@render streakNote(reward)}{/if}
       {#if leveled}<p class="lvl">Level up! Lv {level()}</p>{/if}
+      {#if quiz.missed.length}
+        <div class="sum-missed">
+          <h3>Keep practising</h3>
+          {#each quiz.missed as m (m.item.id)}
+            <div class="line">
+              <span class="jp" lang="ja">{m.item.front}</span><em>{m.item.back}</em>
+              {#if m.fixed}<span class="good">✓ reviewed</span>{/if}
+            </div>
+          {/each}
+        </div>
+      {/if}
       <button class="primary" onclick={onClose}>Done</button>
     </div>
   {:else if !quiz.current}
@@ -105,7 +144,7 @@
       <button onclick={onClose}>Back</button>
     </div>
   {:else}
-    <QuizCard {quiz} onNext={next} nextLabel={finished ? (mode === 'weed' ? 'Pull it 🌿' : 'Finish ✓') : mode === 'weed' ? 'Try another ▶' : 'Next ▶'} />
+    <QuizCard {quiz} onNext={next} {nextLabel} auto={quiz.reviewing ? quiz.reviewLeft > 0 : !finished} />
   {/if}
 </section>
 

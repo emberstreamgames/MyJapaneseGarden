@@ -8,12 +8,13 @@
   import { BLEED, PLANT_SCALE, SPOTS, VIEW, WEED_SPOTS } from './meadow'
   import { STEM_TOP } from './plants'
   import * as sfx from './sfx'
-  import { app, collectVisitor, meetCreature, reminderItem, tourDid, visitorReady } from './store.svelte'
+  import { app, collectVisitor, meetCreature, record, reminderItem, tourDid, visitorReady } from './store.svelte'
 
   // Garden visitors. Once a visitor is due (garden.ts visitorDue), a creature (creatures.ts) arrives
   // and settles: fliers often on an open flower, the rest on the lawn. Tapping it logs it in the
-  // collection and opens a card with a word to review and a few coins, collected on confirm. One
-  // that isn't thanked leaves after a while and a later one comes instead.
+  // collection and opens a card with a word to recall: the player reveals the meaning, says how they
+  // did (recorded like a quiz answer), and collects a few coins. One that isn't thanked leaves after
+  // a while and a later one comes instead.
 
   type Pt = { x: number; y: number }
   interface Visitor {
@@ -36,7 +37,7 @@
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
 
   let visitor = $state<Visitor | null>(null)
-  let card = $state<{ v: Visitor; item: Item | null; coins: number } | null>(null)
+  let card = $state<{ v: Visitor; item: Item | null; coins: number; shown: boolean } | null>(null)
   let gain = $state<{ id: number; x: number; y: number; coins: number } | null>(null)
   let n = 0
   let el: SVGGElement | undefined
@@ -152,14 +153,16 @@
       v.met = true
       v.first = meetCreature(creatureKey(v.creature, v.look))
     }
-    card = { v, item: reminderItem(), coins: visitorCoins(Math.random()) }
+    card = { v, item: reminderItem(), coins: visitorCoins(Math.random()), shown: false }
     if (!app.muted) sfx[CREATURES[v.creature].call]()
   }
 
-  function thank() {
+  // `knew` is the player's own verdict on the word, if the card had one.
+  function thank(knew?: boolean) {
     if (!card) return
-    const { coins } = card
+    const { coins, item } = card
     card = null
+    if (item && knew !== undefined) record(item.id, knew)
     if (!collectVisitor(coins)) return leave()
     tourDid('visitor')
     if (!app.muted) sfx.coin()
@@ -222,15 +225,26 @@
       <p class="variant">{findLook(c.v.creature, c.v.look).name} · <span lang="ja">{info.jp}</span></p>
       {#if c.v.first}<p class="discovery">✨ New! Added to your collection</p>{/if}
       {#if c.item}
-        <p class="dim">It brought you a word to remember:</p>
+        <p class="dim">{c.shown ? 'It brought you this word:' : 'It brought you a word. Do you remember it?'}</p>
         <div class="vword">
           <div class="big" class:long={c.item.front.length > 4} lang="ja">{c.item.front}</div>
-          {#if c.item.hint}<div class="hint" lang="ja">{c.item.hint}</div>{/if}
-          <div class="answer">{c.item.back}</div>
+          <!-- A kanji's readings give it away, as in the quizzes. -->
+          {#if c.item.hint && (c.shown || c.item.type !== 'kanji')}<div class="hint" lang="ja">{c.item.hint}</div>{/if}
+          {#if c.shown}<div class="answer">{c.item.back}</div>{/if}
         </div>
       {/if}
       <p class="coins">and a little gift: +{c.coins} 🪙</p>
-      <button class="primary big-btn" onclick={thank}>ありがとう! Thank you</button>
+      {#if !c.item}
+        <button class="primary big-btn" onclick={() => thank()}>ありがとう! Thank you</button>
+      {:else if !c.shown}
+        <button class="primary big-btn" onclick={() => (c.shown = true)}>Show meaning</button>
+      {:else}
+        <p class="vask">How did you do?</p>
+        <div class="vgrade">
+          <button class="big-btn" onclick={() => thank(false)}>Still learning</button>
+          <button class="primary big-btn" onclick={() => thank(true)}>Got it!</button>
+        </div>
+      {/if}
     </div>
   </div>
 {/if}

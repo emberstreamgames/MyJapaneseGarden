@@ -170,6 +170,9 @@ export function record(id: string, correct: boolean) {
   save()
 }
 
+// Whether a garden quiz is on screen.
+export const quizState = $state({ open: false })
+
 export const XP_PER_LEVEL = 1200
 
 export const level = () => Math.floor(app.xp / XP_PER_LEVEL) + 1

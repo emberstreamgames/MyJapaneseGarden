@@ -191,7 +191,7 @@
 
 {#if quiz}
   {@const q = quiz}
-  <GardenQuiz deck={q.deck} mode={q.mode} bonus={q.bonus} onComplete={(right) => complete(q.target, q.mode, right)} onClose={closeQuiz} />
+  <GardenQuiz deck={q.deck} mode={q.mode} plot={q.mode === 'weed' ? null : app.garden[q.target]} bonus={q.bonus} onComplete={(right) => complete(q.target, q.mode, right)} onClose={closeQuiz} />
 {:else}
   <section class="garden">
     <div class="hud">
