@@ -1,4 +1,5 @@
 import { ITEMS, type Deck, type Item } from '../data/items'
+import { REVIEW_MAX } from './garden'
 import { app, buyHint, poolFor, record, save } from './store.svelte'
 import * as sfx from './sfx'
 
@@ -12,6 +13,17 @@ export const CHEERS = [
   { en: 'Keep going!', ja: 'もういちど', gloss: 'mō ichido: “one more time”' },
   { en: 'Nice try!', ja: 'ファイト', gloss: 'faito: “you can do it”' },
 ]
+
+// "to wear (on the body)" also passes as "to wear" or "wear". This lives here, not in the data rows,
+// because rows sharing an answer never appear as each other's choices (docs/CONTENT.md).
+export function accepted(it: Item, typed: string): boolean {
+  if (it.answers.includes(typed)) return true
+  if (it.type !== 'vocab' && it.type !== 'kanji') return false
+  return it.answers.some((a) => {
+    const bare = a.replace(/\s*\([^)]*\)/g, '').trim()
+    return !!bare && (bare === typed || bare.replace(/^to /, '') === typed)
+  })
+}
 
 // The question/answer engine shared by free practice and the garden quizzes.
 export class Quiz {
@@ -30,6 +42,10 @@ export class Quiz {
   answered = $state(0) // questions answered since this quiz was created
   cheer = $state(0) // index into CHEERS for the last wrong answer
   revealed = $state(false) // the player paid to see this question's hint
+  missed = $state<{ item: Item; fixed: boolean }[]>([]) // cards missed, each once; fixed once right on review
+  reviewing = $state(false) // the round after a quiz that asks misses again
+  reviewTotal = $state(0)
+  reviewDone = $state(0)
 
   private deckOf: () => Deck
   private lastId = ''
@@ -66,7 +82,20 @@ export class Quiz {
     return 1 + missRate * 4 + (s.streak === 0 ? 1 : 0)
   }
 
+  get reviewLeft(): number {
+    return this.reviewTotal - this.reviewDone
+  }
+
+  // Ask the misses once more. Nothing here counts: a retry seconds later isn't evidence of knowing a card.
+  beginReview() {
+    this.reviewing = true
+    this.reviewTotal = Math.min(this.missed.length, REVIEW_MAX)
+    this.gain = null
+    this.next()
+  }
+
   next() {
+    if (this.reviewing) return this.ask(this.missed[this.reviewDone].item)
     const pool = this.pool
     const items = pool.length > 1 ? pool.filter((i) => i.id !== this.lastId) : pool
     if (!items.length) {
@@ -83,6 +112,10 @@ export class Quiz {
         break
       }
     }
+    this.ask(pick)
+  }
+
+  private ask(pick: Item) {
     this.current = pick
     this.lastId = pick.id
     this.typed = ''
@@ -113,16 +146,27 @@ export class Quiz {
   answer(ok: boolean) {
     if (!this.current || this.result) return
     this.result = ok ? 'right' : 'wrong'
-    this.answered++
-    record(this.current.id, ok)
+    const id = this.current.id
+    const review = this.reviewing
+    if (review) {
+      this.reviewDone++
+      const m = this.missed.find((m) => m.item.id === id)
+      if (ok && m) m.fixed = true
+    } else {
+      this.answered++
+      record(id, ok)
+      if (!ok && !this.missed.some((m) => m.item.id === id)) this.missed.push({ item: this.current, fixed: false })
+    }
     if (ok) {
-      this.combo++
-      this.session.right++
-      if (this.combo > app.best) app.best = this.combo
-      if (this.combo > this.bestCombo) this.bestCombo = this.combo
-      const amount = 10 + Math.min(this.combo, 10) * 2
-      app.xp += amount
-      this.gain = { id: ++this.n, amount }
+      if (!review) {
+        this.combo++
+        this.session.right++
+        if (this.combo > app.best) app.best = this.combo
+        if (this.combo > this.bestCombo) this.bestCombo = this.combo
+        const amount = 10 + Math.min(this.combo, 10) * 2
+        app.xp += amount
+        this.gain = { id: ++this.n, amount }
+      }
       const combo = this.combo
       this.burst = {
         id: ++this.n,
@@ -135,14 +179,16 @@ export class Quiz {
       // A level-up has its own popup and sound (LevelUp.svelte).
       if (!app.muted) sfx.good(this.combo)
     } else {
-      this.combo = 0
-      this.session.wrong++
+      if (!review) {
+        this.combo = 0
+        this.session.wrong++
+      }
       this.shake = ++this.n
       // A different one each time.
       this.cheer = (this.cheer + 1 + Math.floor(Math.random() * (CHEERS.length - 1))) % CHEERS.length
       if (!app.muted) sfx.bad()
     }
-    save()
+    if (!review) save()
   }
 
   submitTyped(e: Event) {
@@ -150,7 +196,7 @@ export class Quiz {
     if (!this.current || this.result) return
     const t = this.typed.trim().toLowerCase()
     if (!t) return
-    this.answer(this.current.answers.includes(t))
+    this.answer(accepted(this.current, t))
   }
 
   choose(o: string) {

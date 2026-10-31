@@ -4,7 +4,14 @@
   import { CHEERS, type Quiz } from './quiz.svelte'
   import { app } from './store.svelte'
 
-  let { quiz, onNext, nextLabel = 'Next ▶' }: { quiz: Quiz; onNext: () => void; nextLabel?: string } = $props()
+  const AUTO_NEXT_MS = 800
+
+  let {
+    quiz,
+    onNext,
+    nextLabel = 'Next ▶',
+    auto = true,
+  }: { quiz: Quiz; onNext: () => void; nextLabel?: string; auto?: boolean } = $props()
 
   let input = $state<HTMLInputElement>()
 
@@ -13,6 +20,14 @@
     quiz.revealHint()
     input?.focus()
   }
+
+  // A right answer moves on by itself, unless there's something new to read: a kanji's readings
+  // only appear now, so that card waits (unless they were already bought).
+  $effect(() => {
+    if (!auto || quiz.result !== 'right' || (quiz.current?.type === 'kanji' && !quiz.revealed)) return
+    const t = setTimeout(onNext, AUTO_NEXT_MS)
+    return () => clearTimeout(t)
+  })
 
   function onKey(e: KeyboardEvent) {
     if (e.key === 'Enter' && quiz.result) {
@@ -31,7 +46,7 @@
       {#key quiz.shake}
         <div class="card" class:shake={quiz.result === 'wrong'} class:right={quiz.result === 'right'}>
           <div class="tagline">{DECK_LABEL[quiz.deck]} · {current.tag}</div>
-          <div class="big" class:long={current.front.length > 4} lang="ja">{current.front}</div>
+          <div class="big" class:mid={current.front.length === 4} class:long={current.front.length > 4} lang="ja">{current.front}</div>
           {#if quiz.hintLocked}
             <div class="hint-buy">
               <button disabled={app.coins < HINT_COST} onclick={reveal}>🪙 {HINT_COST} · Show readings</button>
@@ -89,15 +104,15 @@
           </div>
         {/key}
       {/if}
-      {#if quiz.gain && quiz.result === 'right'}
-        {#key quiz.gain.id}<div class="gain" aria-hidden="true">+{quiz.gain.amount} XP</div>{/key}
-      {/if}
     </div>
 
     {#if quiz.result}
       <div class="row">
         {#if quiz.result === 'right'}
-          <div class="verdict right">Correct!</div>
+          <div class="verdict right">
+            Correct!
+            {#if quiz.gain}{#key quiz.gain.id}<b class="gain" aria-hidden="true">+{quiz.gain.amount} XP</b>{/key}{/if}
+          </div>
         {:else}
           {@const c = CHEERS[quiz.cheer]}
           <div class="verdict wrong">{c.en} <span lang="ja">{c.ja}</span><small>({c.gloss})</small></div>

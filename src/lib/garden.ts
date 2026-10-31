@@ -12,6 +12,7 @@ export const SEEDED = 1
 export const BLOOMED = STAGE_NAMES.length - 1
 
 export const QUIZ_LENGTH = 10
+export const REVIEW_MAX = 5 // misses asked again after a watering or grooming quiz
 export const WATER_BONUS_XP = 50
 export const GROOM_BONUS_XP = 30
 // Extra coins for answering every question of a watering or grooming quiz right.

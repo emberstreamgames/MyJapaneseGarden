@@ -12,7 +12,7 @@
   import Stats from './lib/Stats.svelte'
   import Tour from './lib/Tour.svelte'
   import { N5, type Lesson } from './data/build'
-  import { app, level, levelHold, setTour, toggleLesson, tourDid, type Preserved } from './lib/store.svelte'
+  import { app, level, levelHold, quizState, setTour, toggleLesson, tourDid, type Preserved } from './lib/store.svelte'
 
   type Tab = 'garden' | 'shop' | 'collection' | 'hiragana' | 'katakana' | 'kanji' | 'vocab' | 'grammar' | 'stats'
   // `hidden` leaves a screen out of the menu. The free practice decks are off for now.
@@ -62,8 +62,9 @@
     fresh = p
   }
   const lessons: Lesson[] = [...Array.from({ length: 13 }, (_, i) => i), N5]
-  // The chips choose vocab and kanji chapters, so only the screens they affect show them.
-  const chips = $derived(tab !== 'collection' && tab !== 'shop' && tab !== 'hiragana' && tab !== 'katakana')
+  // The chips choose vocab and kanji chapters, so only the screens they affect show them, and not
+  // during a garden quiz, whose pool shouldn't change under it.
+  const chips = $derived(!quizState.open && tab !== 'collection' && tab !== 'shop' && tab !== 'hiragana' && tab !== 'katakana')
 
   // Celebrate each new level. `seen` starts at the loaded level so opening the app doesn't count,
   // and follows a reset back down. A quiz in progress holds the popup back (levelHold); after that a
