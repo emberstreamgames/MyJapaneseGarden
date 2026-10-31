@@ -6,12 +6,14 @@
   import { DECOR, available } from './decor'
   import { DECK_LABEL, type Deck } from '../data/items'
   import GardenQuiz from './GardenQuiz.svelte'
-  import { BLOOMED, WEED_BONUS_XP, WEED_COINS, WELCOME_AFTER_MS, completionBonus, formatWait, msUntilReady, phaseOf, type Weed } from './garden'
-  import { SCENE, WEED_SPOTS, weedBox } from './meadow'
+  import GrowBeam from './GrowBeam.svelte'
+  import { BLOOMED, WEED_BONUS_XP, WEED_COINS, WELCOME_AFTER_MS, completionBonus, formatWait, msUntilReady, phaseOf, type Species, type Weed } from './garden'
+  import { WEED_SPOTS, scene, weedBox } from './meadow'
   import PlotSheet from './PlotSheet.svelte'
   import PlotTile from './PlotTile.svelte'
   import * as sfx from './sfx'
-  import { antCoinReady, app, finishQuiz, level, levelProgress, markSeen, poolFor, pullWeed, setTour, tendWeeds, tourDid, type Preserved } from './store.svelte'
+  import Sky from './Sky.svelte'
+  import { antCoinReady, app, finishQuiz, growPlot, level, levelProgress, markSeen, poolFor, pullWeed, setTour, tendWeeds, tourDid, type Preserved } from './store.svelte'
   import { dayNumber, liveStreak, rainedDays } from './streak'
   import Visitors from './Visitors.svelte'
   import Welcome, { type Away } from './Welcome.svelte'
@@ -34,6 +36,7 @@
   let away = $state<Away | null>(null)
   let weedAsk = $state<{ w: Weed; deck: Deck } | null>(null) // the pre-screen before a weed's question
   let earned = 0 // perfect and streak coins from the quiz just finished, flown in on return
+  let growing = $state<{ index: number; species: Species; stage: number; free: boolean }[]>([]) // plots under a sunbeam; free once it has passed
 
   // Keep countdowns fresh and weeds growing, and catch up when the tab comes back to the foreground.
   // After a long time away, say what happened meanwhile.
@@ -65,7 +68,7 @@
     return waits.length ? Math.min(...waits) : null
   })
   const planted = $derived(app.garden.filter((p) => p).length)
-  const unplaced = $derived(DECOR.some((d) => available(app.decor, d.id) > 0) && app.decor.placed.some((p) => !p))
+  const unplaced = $derived(DECOR.some((d) => available(app.decor, d.id) > 0) && app.decor.placed.slice(0, app.decor.open).some((p) => !p))
   const today = $derived(dayNumber(now))
   const streak = $derived(liveStreak(app.streak, today))
   const studiedToday = $derived(app.streak.day === today)
@@ -87,9 +90,33 @@
 
   function open(i: number) {
     now = Date.now()
-    selected = i
+    if (beamed(i)) return
     const p = app.garden[i]
+    if (p && phaseOf(p, now) === 'ready') return beginGrow(i)
+    selected = i
     if (p && phaseOf(p, now) === 'thirsty') tourDid('water')
+  }
+
+  // A ready plant grows where it stands. Several can grow at once, so a row of them takes a row of taps.
+  const beamed = (i: number) => growing.some((g) => g.index === i && !g.free)
+
+  function beginGrow(i: number) {
+    const p = app.garden[i]
+    if (!p || growing.some((g) => g.index === i)) return
+    selected = null
+    growing.push({ index: i, species: p.species, stage: p.stage, free: false })
+  }
+
+  function grow(i: number) {
+    const grown = growPlot(i)
+    if (!grown) return null
+    now = Date.now()
+    const bloom = app.garden[i]?.stage === BLOOMED
+    if (!app.muted) {
+      ;(bloom ? sfx.bloom : sfx.grow)()
+      if (grown.found) setTimeout(sfx.fanfare, 1300)
+    }
+    return { bloom, found: grown.found }
   }
 
   function closeSheet() {
@@ -102,6 +129,7 @@
     const p = app.garden[i]
     if (!p) return
     selected = null
+    growing = [] // the quiz replaces the bed; a beam cut short leaves its plant ready
     watered = null
     tourDid('quiz')
     quiz = { target: i, deck: p.deck, mode: p.stage === BLOOMED ? 'groom' : 'water', bonus: completionBonus(p) }
@@ -118,6 +146,7 @@
     if (!weedAsk) return
     const { w, deck } = weedAsk
     weedAsk = null
+    growing = []
     pulled = null
     quiz = { target: w.spot, deck, mode: 'weed', bonus: WEED_BONUS_XP }
   }
@@ -175,11 +204,11 @@
     </div>
 
     <div class="bed">
-      {@html SCENE}
+      {@html scene(app.look.wearing)}
       <Decor {onShop} />
       <div class="plots">
         {#each app.garden as plot, i (i)}
-          <PlotTile {plot} index={i} {now} onclick={() => open(i)} />
+          <PlotTile {plot} index={i} {now} growing={beamed(i)} onclick={() => open(i)} />
         {/each}
       </div>
       {#each app.weeds as w (w.spot)}
@@ -189,6 +218,7 @@
       {/each}
       <Ants />
       <Visitors />
+      <Sky sky={app.look.wearing.sky} />
       {#if pluck}
         {@const p = pluck}
         <WeedPluck spot={p.spot} kind={p.kind} onPop={() => !app.muted && sfx.pluck()} onDone={() => (pluck = null)} />
@@ -196,6 +226,17 @@
       {#if splash !== null}
         <WaterSplash index={splash} onLand={() => !app.muted && sfx.splash()} onDone={() => (splash = null)} />
       {/if}
+      {#each growing as g (g.index)}
+        <GrowBeam
+          index={g.index}
+          species={g.species}
+          stage={g.stage}
+          onStart={() => !app.muted && sfx.charge(1.4)}
+          onGrow={() => grow(g.index)}
+          onFree={() => (g.free = true)}
+          onDone={() => (growing = growing.filter((o) => o.index !== g.index))}
+        />
+      {/each}
     </div>
 
     <p class="gstatus">
@@ -214,7 +255,7 @@
   </section>
 
   {#if selected !== null}
-    <PlotSheet index={selected} {now} onClose={closeSheet} onStart={startQuiz} onPreserved={preserved} />
+    <PlotSheet index={selected} {now} onClose={closeSheet} onStart={startQuiz} onGrow={beginGrow} onPreserved={preserved} />
   {/if}
   {#if weedAsk}
     {@const a = weedAsk}

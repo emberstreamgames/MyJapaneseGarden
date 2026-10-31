@@ -2,14 +2,16 @@ import { untrack } from 'svelte'
 import type { Lesson } from '../data/build'
 import { ITEMS, deckReady, type Deck, type Item } from '../data/items'
 import {
-  ANT_COINS, BLOOMED, COMPLETE_COINS, COOLDOWN_MS, GROW_COINS, PERFECT_COINS, PLOT_COUNT, PRESERVE_COINS, PRESERVE_GROOMS, QUIZ_LENGTH,
+  ANT_COINS, BLOOMED, COMPLETE_COINS, COOLDOWN_MS, GROW_COINS, HINT_COST, PERFECT_COINS, PLOT_COUNT, PRESERVE_COINS, PRESERVE_GROOMS, QUIZ_LENGTH,
   SEEDED, SKIP_COST, SPECIES, WEED_BONUS_XP, WEED_COINS, WEED_EVERY_MS,
   advance, antCoinDue, canPreserve, completeQuiz, completionBonus, normalizeGarden, normalizeWeeds, plantSeed, shrinkGarden, skipRest, sproutWeeds,
   VISITOR_COINS, visitorDue, type Plot, type Species, type Weed,
 } from './garden'
 import { rollVariant } from './blooms'
 import { discover, flowerKey, normalizeCollection, press, type Collection } from './collection'
-import { DECOR_BY_ID, buy, move, newDecor, normalizeDecor, place, unplace, type DecorState } from './decor'
+import { meet, normalizeCreatures, type CreatureLog } from './creatures'
+import { DECOR_BY_ID, buy, move, newDecor, nextSpotPrice, normalizeDecor, openSpot, place, unplace, upgrade, upgradeCost, type DecorState } from './decor'
+import { LOOK_BY_ID, newLook, normalizeLook, type LookState } from './look'
 import { DECOR_SPOTS, WEED_SPOTS } from './meadow'
 import { dayNumber, newStreak, normalizeStreak, studyOn, type Streak, type StudyResult } from './streak'
 import { nextStep, normalizeTour, type TourStep } from './tour'
@@ -35,11 +37,13 @@ interface Saved {
   weedAt: number // when the weed timer last ticked
   coins: number
   antCoinAt: number // when the last ant's coin was collected
-  visitorAt: number // when the last butterfly or bird was thanked
+  visitorAt: number // when the last visitor was thanked
   seenAt: number // last time the garden was on screen, for the welcome-back card
   streak: Streak
   collection: Collection // pressed flowers, keyed by collection.ts flowerKey
+  creatures: CreatureLog // visitors tapped, keyed by creatures.ts creatureKey
   decor: DecorState // lawn decorations bought in the shop
+  look: LookState // lawn, soil, bed edging and atmosphere bought in the shop
   tour: TourStep | null // tutorial step, null once finished or skipped
   debug: boolean // hidden debug tools unlocked in Settings
   lessons: Lesson[] // enabled chips: Genki lessons and/or 'n5'
@@ -52,7 +56,7 @@ interface Saved {
 
 const KEY = 'genki-study-v1'
 
-const SAVE_VERSION = 7 // 3: coins, weeds and ants. 4: streak, collection, visitors. 5: decorations. 6: tutorial. 7: 10 plots
+const SAVE_VERSION = 9 // 3: coins, weeds and ants. 4: streak, collection, visitors. 5: decorations. 6: tutorial. 7: 10 plots. 8: upgrades, lawn spots, garden looks. 9: creature collection
 
 const defaults = (): Saved => ({
   version: SAVE_VERSION,
@@ -66,7 +70,9 @@ const defaults = (): Saved => ({
   seenAt: 0,
   streak: newStreak(),
   collection: {},
+  creatures: {},
   decor: newDecor(DECOR_SPOTS.length),
+  look: newLook(),
   tour: 'hello',
   debug: false,
   lessons: [1, 2],
@@ -102,7 +108,9 @@ function repair(data: Saved): Saved {
     else data.coins += GROW_COINS * p.stage
   }
   data.collection = found
+  data.creatures = normalizeCreatures(data.creatures)
   data.decor = normalizeDecor(data.decor, DECOR_SPOTS.length)
+  data.look = normalizeLook(data.look)
   data.mode = normalizeMode(data.mode)
   // Players from before the tutorial already know their way around.
   data.tour = data.version < 6 ? null : normalizeTour(data.tour)
@@ -284,6 +292,13 @@ export function skipWait(i: number, now = Date.now()): boolean {
   return true
 }
 
+export function buyHint(): boolean {
+  if (app.coins < HINT_COST) return false
+  app.coins -= HINT_COST
+  save()
+  return true
+}
+
 // Grow any weeds that are due. Safe to call often.
 export function tendWeeds(now = Date.now()) {
   const { weeds, lastAt } = sproutWeeds(app.weeds, app.weedAt, now, WEED_SPOTS.length, Math.random)
@@ -325,6 +340,14 @@ export function collectVisitor(coins: number, now = Date.now()): boolean {
   return true
 }
 
+// Log a visitor in the creature collection. True the first time this one is seen.
+export function meetCreature(key: string, now = Date.now()): boolean {
+  const first = !app.creatures[key]
+  app.creatures = meet(app.creatures, key, now)
+  save()
+  return first
+}
+
 // A word for a visitor to bring: vocab from the enabled chapters, leaning on words already met and
 // often missed, so it works as a reminder. Falls back to kanji, then to any vocab.
 export function reminderItem(): Item | null {
@@ -364,6 +387,26 @@ export function buyDecor(id: string): boolean {
   return true
 }
 
+export function upgradeDecor(id: string): boolean {
+  const cost = upgradeCost(app.decor, id)
+  const next = cost !== null && app.coins >= cost && upgrade(app.decor, id)
+  if (!next) return false
+  app.coins -= cost
+  app.decor = next
+  save()
+  return true
+}
+
+export function buySpot(): boolean {
+  const cost = nextSpotPrice(app.decor)
+  const next = cost !== null && app.coins >= cost && openSpot(app.decor)
+  if (!next) return false
+  app.coins -= cost
+  app.decor = next
+  save()
+  return true
+}
+
 function setDecor(next: DecorState | null): boolean {
   if (!next) return false
   app.decor = next
@@ -380,6 +423,25 @@ export function giftRock(spot: number): boolean {
 export const placeDecor = (spot: number, id: string) => setDecor(place(app.decor, spot, id))
 export const storeDecor = (spot: number) => setDecor(unplace(app.decor, spot))
 export const moveDecor = (from: number, to: number) => setDecor(move(app.decor, from, to))
+
+// Garden looks: bought once, then worn. Buying one also puts it on.
+
+export function buyLook(id: string): boolean {
+  const item = LOOK_BY_ID[id]
+  if (!item || app.look.owned.includes(id) || app.coins < item.price) return false
+  app.coins -= item.price
+  app.look = { owned: [...app.look.owned, id], wearing: { ...app.look.wearing, [item.part]: id } }
+  save()
+  return true
+}
+
+export function wearLook(id: string): boolean {
+  const item = LOOK_BY_ID[id]
+  if (!item || !(item.price === 0 || app.look.owned.includes(id))) return false
+  app.look = { ...app.look, wearing: { ...app.look.wearing, [item.part]: id } }
+  save()
+  return true
+}
 
 // The tutorial. Components report what the player did; it only counts on the step that asked for it.
 
@@ -439,8 +501,17 @@ export function debugPreservable(i: number) {
   save()
 }
 
-export function debugAddCoins(n = SKIP_COST) {
-  app.coins += n
+export function debugAddCoins(n: number) {
+  app.coins = Math.max(0, app.coins + Math.floor(n || 0))
+  save()
+}
+
+// Skip the watering and the cooldown: ready to grow (a bloom goes back to thirsty). A long-past
+// doneAt, not `now - COOLDOWN_MS`, because the garden's clock can run up to 30 s behind.
+export function debugReady(i: number) {
+  const p = validSlot(i) ? app.garden[i] : null
+  if (!p) return
+  p.doneAt = 0
   save()
 }
 

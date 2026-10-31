@@ -1,12 +1,10 @@
 <script lang="ts">
   import { DECK_LABEL, ITEMS, type Deck, type Item } from '../data/items'
   import pkg from '../../package.json'
-  import { BLOOMED, PLOT_COUNT, STAGE_NAMES } from './garden'
+  import ConfirmSheet from './ConfirmSheet.svelte'
+  import { BLOOMED, PLOT_COUNT } from './garden'
   import { FLOWERS } from './collection'
-  import {
-    app, debugAddCoins, debugAntCoin, debugFill, debugPreservable, debugSetStage, debugSkipTime, debugSproutWeed, debugStreakDay, debugVisitor,
-    MASTERY_STREAK, exportData, importData, level, poolFor, resetGarden, resetStats, save, setTour,
-  } from './store.svelte'
+  import { app, MASTERY_STREAK, exportData, importData, level, poolFor, resetGarden, resetStats, save, setTour } from './store.svelte'
   import { dayNumber, liveStreak } from './streak'
 
   const rows = $derived(
@@ -55,12 +53,9 @@
       taps = 0
       app.debug = !app.debug
       save()
-      msg = app.debug ? 'Debug tools unlocked.' : 'Debug tools hidden.'
+      msg = app.debug ? 'Debug tools unlocked: tap the 🛠 button.' : 'Debug tools hidden.'
     }
   }
-
-  let dbgPlot = $state(1)
-  let dbgStage = $state(BLOOMED)
 
   function download() {
     const url = URL.createObjectURL(new Blob([exportData()], { type: 'application/json' }))
@@ -77,18 +72,18 @@
     msg = importData(await f.text()) ? 'Progress imported.' : 'That file could not be read.'
   }
 
+  let asking = $state<'garden' | 'stats' | null>(null) // which reset is being confirmed
+
   function resetPlants() {
-    if (confirm('Remove every plant and start the garden over? Your XP and stats are kept.')) {
-      resetGarden()
-      msg = 'Garden cleared.'
-    }
+    asking = null
+    resetGarden()
+    msg = 'Garden cleared.'
   }
 
   function reset() {
-    if (confirm('Reset all review stats, XP and best combo?')) {
-      resetStats()
-      msg = 'Stats reset.'
-    }
+    asking = null
+    resetStats()
+    msg = 'Stats reset.'
   }
 </script>
 
@@ -166,34 +161,19 @@
     <button onclick={download}>Export progress</button>
     <label class="file">Import progress<input type="file" accept="application/json" onchange={upload} /></label>
     <button onclick={() => setTour('hello')}>Replay tutorial</button>
-    <button class="danger" onclick={reset}>Reset stats</button>
-    <button class="danger" onclick={resetPlants}>Reset garden</button>
+    <button class="danger" onclick={() => (asking = 'stats')}>Reset stats</button>
+    <button class="danger" onclick={() => (asking = 'garden')}>Reset garden</button>
   </div>
   {#if msg}<p class="dim">{msg}</p>{/if}
 
-  {#if app.debug}
-    <h3>Debug tools</h3>
-    <div class="settings">
-      <button onclick={() => debugSkipTime()}>Skip 20 hours</button>
-      <button onclick={debugFill}>Fill empty plots</button>
-      <button onclick={debugSproutWeed}>Sprout a weed</button>
-      <button onclick={() => debugAddCoins()}>+100 coins</button>
-      <button onclick={debugAntCoin}>Next ant brings a coin</button>
-      <button onclick={debugVisitor}>Visitor now</button>
-      <button onclick={debugStreakDay}>Streak: last study a day earlier</button>
-      <label>Plot
-        <select bind:value={dbgPlot}>
-          {#each Array(PLOT_COUNT) as _, i}<option value={i + 1}>{i + 1}</option>{/each}
-        </select>
-      </label>
-      <label>Stage
-        <select bind:value={dbgStage}>
-          {#each STAGE_NAMES.slice(1) as n, i}<option value={i + 1}>{n}</option>{/each}
-        </select>
-      </label>
-      <button onclick={() => debugSetStage(dbgPlot - 1, dbgStage)}>Set stage</button>
-      <button onclick={() => debugPreservable(dbgPlot - 1)}>Make preservable</button>
-    </div>
+  {#if asking === 'stats'}
+    <ConfirmSheet title="Reset your stats?" yes="Reset stats" no="Keep them" danger onYes={reset} onNo={() => (asking = null)}>
+      <p class="dim">This clears all review stats, XP and your best combo.</p>
+    </ConfirmSheet>
+  {:else if asking === 'garden'}
+    <ConfirmSheet title="Start the garden over?" yes="Reset garden" no="Keep it" danger onYes={resetPlants} onNo={() => (asking = null)}>
+      <p class="dim">Every plant will be removed. Your XP and stats are kept.</p>
+    </ConfirmSheet>
   {/if}
 
   <p class="dim ver"><button class="linkish" onclick={tapVersion}>Genki Grow v{pkg.version}</button></p>

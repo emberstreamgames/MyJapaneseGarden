@@ -1,5 +1,6 @@
 <script lang="ts">
   import { DECK_LABEL, deckReady } from '../data/items'
+  import CreatureBook from './CreatureBook.svelte'
   import { FLOWERS, flowerKey, flowerName } from './collection'
   import FlowerHead from './FlowerHead.svelte'
   import { PRESERVE_GROOMS, SPECIES, type Species } from './garden'
@@ -9,6 +10,8 @@
   // The pressed-flower book. Every species/variant shows: hidden until it blooms, then fresh until
   // one is preserved, then pressed (completed). `fresh` is a flower just preserved in the garden.
   let { fresh }: { fresh: Preserved | null } = $props()
+
+  let tab = $state<'flowers' | 'creatures'>('flowers')
 
   const groups = (Object.keys(SPECIES) as Species[]).map((species) => ({ species, flowers: FLOWERS.filter((f) => f.species === species) }))
   const found = $derived(FLOWERS.filter((f) => app.collection[f.key]).length)
@@ -27,6 +30,14 @@
 </script>
 
 <section class="collection">
+  <div class="shop-tabs" role="group" aria-label="Collection sections">
+    <button class="shop-tab" class:on={tab === 'flowers'} aria-pressed={tab === 'flowers'} onclick={() => (tab = 'flowers')}>🌸 Flowers</button>
+    <button class="shop-tab" class:on={tab === 'creatures'} aria-pressed={tab === 'creatures'} onclick={() => (tab = 'creatures')}>🦋 Creatures</button>
+  </div>
+
+  {#if tab === 'creatures'}
+    <CreatureBook />
+  {:else}
   <h2>Pressed flowers</h2>
   <p class="dim">Bloom a flower to discover it. Groom it {PRESERVE_GROOMS} times, then preserve it to complete it.</p>
   <div class="cprog">
@@ -77,4 +88,5 @@
       </div>
     </div>
   {/each}
+  {/if}
 </section>

@@ -145,6 +145,54 @@ export function flutter() {
   ;[1568, 1976, 2349, 1976, 2637].forEach((f, i) => tone(f, i * 0.06, 0.12, 'sine', 0.04))
 }
 
+// A low hum, for bees and the like.
+export function buzz() {
+  if (!ready()) return
+  sweep(210, 240, 0, 0.32, 'sawtooth', 0.025)
+}
+
+// Two soft hoots.
+export function hoot() {
+  if (!ready()) return
+  tone(330, 0, 0.28, 'sine', 0.09)
+  tone(294, 0.34, 0.4, 'sine', 0.08)
+}
+
+// A quick double croak.
+export function ribbit() {
+  if (!ready()) return
+  sweep(180, 320, 0, 0.09, 'square', 0.04)
+  sweep(190, 340, 0.13, 0.1, 'square', 0.04)
+}
+
+// Up and back down.
+export function meow() {
+  if (!ready()) return
+  sweep(500, 900, 0, 0.14, 'triangle', 0.06)
+  sweep(900, 420, 0.14, 0.26, 'triangle', 0.06)
+}
+
+// Two gentle notes, for quiet animals.
+export function pad() {
+  if (!ready()) return
+  tone(523, 0, 0.1, 'sine', 0.06)
+  tone(659, 0.12, 0.12, 'sine', 0.06)
+}
+
+// Two quick clicks of a pair of scissors.
+export function snip() {
+  if (!ready()) return
+  tone(2600, 0, 0.04, 'square', 0.04)
+  tone(1900, 0.05, 0.06, 'square', 0.04)
+}
+
+// A heavy book shutting.
+export function thump() {
+  if (!ready()) return
+  sweep(150, 55, 0, 0.2, 'sine', 0.2)
+  sweep(700, 200, 0, 0.1, 'triangle', 0.04)
+}
+
 // A paper swish, then a warm chord as the flower is pressed.
 export function preserve() {
   if (!ready()) return

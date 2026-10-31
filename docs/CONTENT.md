@@ -36,7 +36,7 @@ const grammar: ByLesson<Row> = {
 
 ## What each field does
 - **Prompt:** the first value (the word, kanji or sentence) is shown large. Long prompts shrink to fit.
-- **Hint:** the reading (vocab, kanji) or translation (grammar) is shown under the prompt.
+- **Hint:** the reading (vocab) or translation (grammar) is shown under the prompt. Kanji readings stay hidden until the question is answered, or until the player pays `HINT_COST` coins.
 - **Answer:** the meaning or missing word is what multiple choice shows and what a typed answer must match.
 - **Typed answers:** the answer plus any extra values in the row are accepted. They are lowercased and trimmed for you.
 - Grammar answers are kana. Add romaji alternatives (`'wa'`, `'ha'`) so they can be typed without a Japanese keyboard.

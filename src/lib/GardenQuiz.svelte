@@ -1,6 +1,7 @@
 <script lang="ts">
   import { DECK_LABEL, type Deck } from '../data/items'
   import Celebration from './Celebration.svelte'
+  import ConfirmSheet from './ConfirmSheet.svelte'
   import { PERFECT_COINS, QUIZ_LENGTH } from './garden'
   import { STREAK_RAIN_EVERY } from './streak'
   import { Quiz } from './quiz.svelte'
@@ -33,6 +34,7 @@
   let summary = $state(false)
   let leveled = $state(false) // the completion bonus pushed the player up a level
   let reward = $state<QuizReward | null>(null)
+  let quitting = $state(false) // asking whether to give up on the plant
 
   $effect(() => quiz.sync())
   // Level-ups are celebrated once the quiz is over.
@@ -63,7 +65,8 @@
 
   function quit() {
     // Leaving a weed loses nothing: it stays on the lawn.
-    if (finished || mode === 'weed' || quiz.answered === 0 || confirm('Quit now? Your plant will not be ' + (mode === 'groom' ? 'groomed.' : 'watered.'))) onClose()
+    if (finished || mode === 'weed' || quiz.answered === 0) onClose()
+    else quitting = true
   }
 </script>
 
@@ -105,6 +108,12 @@
     <QuizCard {quiz} onNext={next} nextLabel={finished ? (mode === 'weed' ? 'Pull it 🌿' : 'Finish ✓') : mode === 'weed' ? 'Try another ▶' : 'Next ▶'} />
   {/if}
 </section>
+
+{#if quitting}
+  <ConfirmSheet title="Quit now?" yes="Quit" no="Keep going" danger onYes={onClose} onNo={() => (quitting = false)}>
+    <p class="dim">Your plant will not be {mode === 'groom' ? 'groomed' : 'watered'}.</p>
+  </ConfirmSheet>
+{/if}
 
 {#snippet streakNote(r: QuizReward)}
   {@const n = r.study.streak.count}
