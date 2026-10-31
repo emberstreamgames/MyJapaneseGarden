@@ -1,21 +1,28 @@
 <script lang="ts">
   import { DECK_LABEL, deckReady, type Deck } from '../data/items'
-  import { BLOOMED, GROW_COINS, PRESERVE_GROOMS, SKIP_COST, SPECIES, STAGE_NAMES, canPreserve, formatWait, msUntilReady, phaseOf, speciesFor, type Species } from './garden'
-  import Celebration from './Celebration.svelte'
-  import { flyCoinsFrom } from './coinfly.svelte'
+  import { BLOOMED, PRESERVE_GROOMS, SKIP_COST, SPECIES, STAGE_NAMES, canPreserve, formatWait, msUntilReady, phaseOf, speciesFor, type Species } from './garden'
+  import ConfirmSheet from './ConfirmSheet.svelte'
+  import FlowerHead from './FlowerHead.svelte'
   import PlantSprite from './PlantSprite.svelte'
-  import { ART } from './plants'
   import { bloomName } from './blooms'
   import * as sfx from './sfx'
-  import { app, growPlot, plantAt, poolFor, preservePlant, removePlant, skipWait, tourDid, type Preserved } from './store.svelte'
+  import { app, plantAt, poolFor, preservePlant, removePlant, skipWait, tourDid, type Preserved } from './store.svelte'
 
   let {
     index,
     now,
     onClose,
     onStart,
+    onGrow,
     onPreserved,
-  }: { index: number; now: number; onClose: () => void; onStart: (i: number) => void; onPreserved: (p: Preserved) => void } = $props()
+  }: {
+    index: number
+    now: number
+    onClose: () => void
+    onStart: (i: number) => void
+    onGrow: (i: number) => void
+    onPreserved: (p: Preserved) => void
+  } = $props()
 
   const DECKS: Deck[] = ['hiragana', 'katakana', 'kanji', 'vocab', 'grammar']
   // A deck can be planted once it has enough quiz content.
@@ -26,22 +33,6 @@
   const bloomed = $derived(plot?.stage === BLOOMED)
   const emptyPool = $derived(plot ? poolFor(plot.deck).length === 0 : false)
 
-  let fx = $state<{ id: number; kind: 'grow' | 'bloom'; found: boolean } | null>(null)
-  let fxId = 0
-  let hero = $state<HTMLElement>()
-
-  function grow() {
-    const grown = growPlot(index)
-    if (!grown) return
-    const kind = app.garden[index]?.stage === BLOOMED ? 'bloom' : 'grow'
-    fx = { id: ++fxId, kind, found: grown.found }
-    flyCoinsFrom(hero, GROW_COINS)
-    if (!app.muted) {
-      ;(kind === 'bloom' ? sfx.bloom : sfx.grow)()
-      if (grown.found) setTimeout(sfx.fanfare, 1300)
-    }
-  }
-
   function plant(s: Species) {
     if (!plantAt(index, s) || app.tour !== 'plant') return
     // The tutorial visits the shop before the first watering, so it doesn't offer the quiz yet.
@@ -49,22 +40,26 @@
     onClose()
   }
 
+  let asking = $state<'preserve' | 'remove' | null>(null) // which confirmation is open
+
   function preserve() {
-    if (!confirm('Dry this flower and press it into your collection? Its plot will be free to plant again.')) return
+    asking = null
     const p = preservePlant(index)
     if (p) onPreserved(p)
   }
 
   // Checked against the `now` the sheet shows, so the plant is ready for it straight after.
+  // A paid skip goes straight on to growing; a bloom just goes back to needing a groom.
   function skip() {
-    if (skipWait(index, now) && !app.muted) sfx.coin()
+    if (!skipWait(index, now)) return
+    if (!app.muted) sfx.coin()
+    if (!bloomed) onGrow(index)
   }
 
   function remove() {
-    if (confirm('Remove this plant? This cannot be undone.')) {
-      removePlant(index)
-      onClose()
-    }
+    asking = null
+    removePlant(index)
+    onClose()
   }
 
   function onKey(e: KeyboardEvent) {
@@ -97,11 +92,9 @@
         </div>
       {/each}
     {:else}
-      <div class="hero" bind:this={hero}>
+      <div class="hero">
         <PlantSprite species={plot.species} stage={plot.stage} variant={plot.variant} />
-        {#if fx}{#key fx.id}<Celebration kind={fx.kind} color={ART[plot.species].bud} /><b class="coin-gain" aria-hidden="true">+{GROW_COINS} 🪙</b>{/key}{/if}
       </div>
-      {#if fx?.found}<p class="discovery">✨ New discovery! Added to your collection</p>{/if}
       <h2>{SPECIES[plot.species].label}</h2>
       {#if bloomed && plot.variant}<p class="variant">✨ {bloomName(plot.species, plot.variant)}</p>{/if}
       <p class="dim">{DECK_LABEL[plot.deck]} · {STAGE_NAMES[plot.stage]} ({plot.stage} of {BLOOMED})</p>
@@ -117,18 +110,30 @@
         <button class="big-btn" disabled={app.coins < SKIP_COST} onclick={skip}>🪙 {SKIP_COST} · Skip the wait</button>
         {#if app.coins < SKIP_COST}<p class="dim">You have {app.coins} coins. Grow plants and pull weeds to earn more.</p>{/if}
       {:else}
-        <button class="hit big-btn" onclick={grow}>✨ Grow to next stage</button>
+        <!-- Only when the rest ran out with the sheet already open: a ready plant skips the sheet. -->
+        <button class="hit big-btn" onclick={() => onGrow(index)}>✨ Grow to next stage</button>
       {/if}
 
       {#if bloomed}
         {#if canPreserve(plot)}
-          <button class="preserve big-btn" onclick={preserve}>🌸 Preserve · dry and press it</button>
+          <button class="preserve big-btn" onclick={() => (asking = 'preserve')}>🌸 Preserve · dry and press it</button>
         {:else}
           <p class="dim pgroom">Groom {PRESERVE_GROOMS - plot.grooms} more {PRESERVE_GROOMS - plot.grooms === 1 ? 'time' : 'times'} to preserve this flower for your collection.</p>
         {/if}
       {/if}
 
-      <button class="danger remove" onclick={remove}>Remove plant</button>
+      <button class="danger remove" onclick={() => (asking = 'remove')}>Remove plant</button>
     {/if}
   </div>
 </div>
+
+{#if asking === 'remove'}
+  <ConfirmSheet title="Remove this plant?" yes="Remove plant" no="Keep it" danger onYes={remove} onNo={() => (asking = null)}>
+    <p class="dim">This cannot be undone.</p>
+  </ConfirmSheet>
+{:else if asking && plot}
+  <ConfirmSheet title="Press this flower?" yes="🌸 Press it" no="Keep growing" onYes={preserve} onNo={() => (asking = null)}>
+    <div class="confirm-art"><FlowerHead species={plot.species} variant={plot.variant} /></div>
+    <p class="dim">It will be dried and pressed into your collection, and this plot will be free to plant again.</p>
+  </ConfirmSheet>
+{/if}

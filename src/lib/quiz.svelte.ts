@@ -1,5 +1,5 @@
 import { ITEMS, type Deck, type Item } from '../data/items'
-import { app, poolFor, record, save } from './store.svelte'
+import { app, buyHint, poolFor, record, save } from './store.svelte'
 import * as sfx from './sfx'
 
 export type Kind = 'choice' | 'type'
@@ -29,6 +29,7 @@ export class Quiz {
   shake = $state(0)
   answered = $state(0) // questions answered since this quiz was created
   cheer = $state(0) // index into CHEERS for the last wrong answer
+  revealed = $state(false) // the player paid to see this question's hint
 
   private deckOf: () => Deck
   private lastId = ''
@@ -44,6 +45,17 @@ export class Quiz {
 
   get pool(): Item[] {
     return poolFor(this.deck)
+  }
+
+  // A kanji's readings give it away, so they cost coins until the question is answered.
+  get hintLocked(): boolean {
+    return this.current?.type === 'kanji' && !this.revealed && !this.result
+  }
+
+  revealHint() {
+    if (!this.hintLocked || !buyHint()) return
+    this.revealed = true
+    if (!app.muted) sfx.coin()
   }
 
   // Items that are new or often missed come up more often.
@@ -76,6 +88,7 @@ export class Quiz {
     this.typed = ''
     this.result = null
     this.picked = ''
+    this.revealed = false
     const kinds: Kind[] = app.mode === 'mix' ? ['choice', 'type'] : [app.mode]
     this.kind = kinds[Math.floor(Math.random() * kinds.length)]
     if (this.kind === 'choice') {

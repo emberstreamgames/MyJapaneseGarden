@@ -1,8 +1,18 @@
 <script lang="ts">
   import { DECK_LABEL, DECK_PROMPT } from '../data/items'
+  import { HINT_COST } from './garden'
   import { CHEERS, type Quiz } from './quiz.svelte'
+  import { app } from './store.svelte'
 
   let { quiz, onNext, nextLabel = 'Next ▶' }: { quiz: Quiz; onNext: () => void; nextLabel?: string } = $props()
+
+  let input = $state<HTMLInputElement>()
+
+  // Paying for a hint shouldn't take the cursor (or a phone's keyboard) away from the answer box.
+  function reveal() {
+    quiz.revealHint()
+    input?.focus()
+  }
 
   function onKey(e: KeyboardEvent) {
     if (e.key === 'Enter' && quiz.result) {
@@ -22,13 +32,20 @@
         <div class="card" class:shake={quiz.result === 'wrong'} class:right={quiz.result === 'right'}>
           <div class="tagline">{DECK_LABEL[quiz.deck]} · {current.tag}</div>
           <div class="big" class:long={current.front.length > 4} lang="ja">{current.front}</div>
-          {#if current.hint}<div class="hint">{current.hint}</div>{/if}
+          {#if quiz.hintLocked}
+            <div class="hint-buy">
+              <button disabled={app.coins < HINT_COST} onclick={reveal}>🪙 {HINT_COST} · Show readings</button>
+              <span class="dim">You have {app.coins}</span>
+            </div>
+          {:else if current.hint}
+            <div class="hint">{current.hint}</div>
+          {/if}
 
           {#if quiz.kind === 'type'}
             {#if !quiz.result}
               <form onsubmit={(e) => quiz.submitTyped(e)}>
                 <!-- svelte-ignore a11y_autofocus -->
-                <input bind:value={quiz.typed} autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder={DECK_PROMPT[quiz.deck]} autofocus />
+                <input bind:this={input} bind:value={quiz.typed} autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder={DECK_PROMPT[quiz.deck]} autofocus />
                 <button class="primary" type="submit">Check</button>
               </form>
             {:else}

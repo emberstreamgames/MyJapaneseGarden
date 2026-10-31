@@ -2,10 +2,12 @@
   import { untrack } from 'svelte'
   import CoinFlights from './lib/CoinFlights.svelte'
   import Collection from './lib/Collection.svelte'
+  import DevTools from './lib/DevTools.svelte'
   import Flashcards from './lib/Flashcards.svelte'
   import Garden from './lib/Garden.svelte'
   import LevelUp from './lib/LevelUp.svelte'
   import Menu from './lib/Menu.svelte'
+  import PressFlower from './lib/PressFlower.svelte'
   import Shop from './lib/Shop.svelte'
   import Stats from './lib/Stats.svelte'
   import Tour from './lib/Tour.svelte'
@@ -13,19 +15,21 @@
   import { app, level, levelHold, setTour, toggleLesson, tourDid, type Preserved } from './lib/store.svelte'
 
   type Tab = 'garden' | 'shop' | 'collection' | 'hiragana' | 'katakana' | 'kanji' | 'vocab' | 'grammar' | 'stats'
-  const tabs: { id: Tab; label: string }[] = [
+  // `hidden` leaves a screen out of the menu. The free practice decks are off for now.
+  const tabs: { id: Tab; label: string; hidden?: boolean }[] = [
     { id: 'garden', label: 'Garden' },
     { id: 'shop', label: 'Garden Shop' },
     { id: 'collection', label: 'Collection' },
-    { id: 'hiragana', label: 'ひらがな' },
-    { id: 'katakana', label: 'カタカナ' },
-    { id: 'kanji', label: '漢字' },
-    { id: 'vocab', label: 'Vocab' },
-    { id: 'grammar', label: 'Grammar' },
+    { id: 'hiragana', label: 'ひらがな', hidden: true },
+    { id: 'katakana', label: 'カタカナ', hidden: true },
+    { id: 'kanji', label: '漢字', hidden: true },
+    { id: 'vocab', label: 'Vocab', hidden: true },
+    { id: 'grammar', label: 'Grammar', hidden: true },
     { id: 'stats', label: 'Stats' },
   ]
   let tab = $state<Tab>('garden')
   let fresh = $state<Preserved | null>(null) // a flower just preserved, shown off on the Collection page
+  let pressing = $state<Preserved | null>(null) // a flower on its way into the book
   let placeAt = $state<number | null>(null) // decoration spot the shop was opened for; the next purchase goes there
 
   function go(id: Tab) {
@@ -46,7 +50,14 @@
     placeAt = spot
   }
 
+  // The flower is already saved: this only plays it into the book before showing the Collection.
   function preserved(p: Preserved) {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) showPressed(p)
+    else pressing = p
+  }
+
+  function showPressed(p: Preserved) {
+    pressing = null
     tab = 'collection'
     fresh = p
   }
@@ -76,8 +87,8 @@
 
 <main>
   <header>
-    <h1>My Japanese Garden</h1>
-    <Menu items={tabs} current={tab} onselect={go} actions={[{ label: '🎓 Replay tutorial', run: () => (setTour('hello'), go('garden')) }]} />
+    <h1><button class="home" onclick={() => go('garden')}>My Japanese Garden</button></h1>
+    <Menu items={tabs.filter((t) => !t.hidden)} current={tab} onselect={go} actions={[{ label: '🎓 Replay tutorial', run: () => (setTour('hello'), go('garden')) }]} />
   </header>
 
   {#if chips}
@@ -106,6 +117,11 @@
 
 <Tour screen={tab} onGarden={() => go('garden')} />
 <CoinFlights />
+<DevTools />
+{#if pressing}
+  {@const p = pressing}
+  <PressFlower species={p.species} variant={p.variant} onDone={() => showPressed(p)} />
+{/if}
 {#if showLevel && due}
   <LevelUp from={due.from} to={due.to} onClose={() => ((showLevel = false), (due = null))} />
 {/if}

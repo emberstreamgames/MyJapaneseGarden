@@ -1,6 +1,9 @@
-// Static artwork for the garden: a lawn with a sunken bed of four tilled rows. Built once from a
-// fixed seed so it looks the same on every visit. Plants, holes and status live in PlotTile,
-// which places itself on SPOTS. Coordinates are in the 400x440 view (the lawn extends BLEED past it).
+// Static artwork for the garden: a lawn with a sunken bed of four tilled rows. Built from a fixed
+// seed so it looks the same on every visit, whatever colours the player picked (look.ts). Plants,
+// holes and status live in PlotTile, which places itself on SPOTS. Coordinates are in the 400x440
+// view (the lawn extends BLEED past it).
+
+import { LOOK_BY_ID, type Wearing } from './look'
 
 export const VIEW = { w: 400, h: 440 }
 // Extra lawn drawn past each side of the view. The bed box stays VIEW-sized so plots and weeds keep
@@ -30,9 +33,13 @@ type Pt = [number, number]
 
 const STONES = [[16, 140, 9], [384, 296, 10], [374, 316, 6], [62, 424, 8]]
 
-// Ground points where decorations stand: the lawn's corners and the middle of each side, all inside
-// VIEW so they show on phones.
-export const DECOR_SPOTS = [{ x: 22, y: 70 }, { x: 378, y: 70 }, { x: 20, y: 236 }, { x: 380, y: 236 }, { x: 40, y: 434 }, { x: 360, y: 434 }]
+// Ground points where decorations stand, all inside VIEW so they show on phones: the lawn's corners
+// and the middle of each side, then the spots bought in the shop (decor.ts BASE_SPOTS), which fill
+// the gaps between the first row's plants and along the sides.
+export const DECOR_SPOTS = [
+  { x: 22, y: 70 }, { x: 378, y: 70 }, { x: 20, y: 236 }, { x: 380, y: 236 }, { x: 40, y: 434 }, { x: 360, y: 434 },
+  { x: 150, y: 58 }, { x: 250, y: 58 }, { x: 20, y: 152 }, { x: 380, y: 152 }, { x: 20, y: 334 }, { x: 380, y: 334 },
+]
 
 // Ground points where weeds can grow: on the lawn, off the soil, and clear of every plot's plant
 // (even empty ones, which may be planted later), the decoration spots, the stones and each other.
@@ -111,7 +118,52 @@ function blade(x: number, y: number, len: number, lean: number, w: number, color
 // Draw back to front so nearer blades overlap farther ones.
 const byDepth = (items: [number, string][]) => items.sort((a, b) => a[0] - b[0]).map((b) => b[1]).join('')
 
-function build() {
+// Evenly spaced points around the bed's outline, nearest last.
+function bedEdge(step: number) {
+  const { cx, cy, rx, ry } = BED
+  const ring: Pt[] = Array.from({ length: 720 }, (_, i) => {
+    const t = (i / 720) * Math.PI * 2, c = Math.cos(t), s = Math.sin(t)
+    return [cx + rx * Math.sign(c) * Math.abs(c) ** (1 / 3), cy + ry * Math.sign(s) * Math.abs(s) ** (1 / 3)]
+  })
+  // The ring's samples spread out where it crosses its axes, so walk along each stretch.
+  const out: Pt[] = []
+  let to = 0
+  ring.forEach((p, i) => {
+    const q = ring[(i + 1) % ring.length], d = Math.hypot(q[0] - p[0], q[1] - p[1])
+    for (; to < d; to += step) out.push([p[0] + ((q[0] - p[0]) * to) / d, p[1] + ((q[1] - p[1]) * to) / d])
+    to -= d
+  })
+  return out.sort((a, b) => a[1] - b[1])
+}
+
+// Bed edging, drawn over the turf lip. It has its own random stream so the rest of the scene stays
+// the same picture with or without it.
+function edging(id: string) {
+  const r = rng(23)
+  let s = ''
+  if (id === 'stones') {
+    for (const [x, y] of bedEdge(19)) {
+      const w = 8 + r() * 3.5, h = w * (0.62 + r() * 0.12)
+      const tone = pick(r, ['#a39f92', '#b4b0a4', '#94928a', '#c0bcae'])
+      s += `<ellipse cx="${f(x + 1)}" cy="${f(y + 3)}" rx="${f(w)}" ry="${f(h)}" fill="#1a1a14" opacity="0.4"/><ellipse cx="${f(x)}" cy="${f(y)}" rx="${f(w)}" ry="${f(h)}" fill="${tone}"/><ellipse cx="${f(x - w * 0.3)}" cy="${f(y - h * 0.3)}" rx="${f(w * 0.42)}" ry="${f(h * 0.36)}" fill="#fff" opacity="0.28"/>`
+    }
+  } else if (id === 'logs') {
+    for (const [x, y] of bedEdge(11)) {
+      const h = 9 + r() * 3.5, top = y + 3 - h
+      s += `<rect x="${f(x - 5)}" y="${f(top)}" width="10" height="${f(h)}" rx="1.5" fill="${pick(r, ['#7a5230', '#6a4628', '#86603a'])}" stroke="#3d2614" stroke-width="0.6"/><ellipse cx="${f(x)}" cy="${f(top)}" rx="5" ry="2.2" fill="#c49a68" stroke="#3d2614" stroke-width="0.6"/><ellipse cx="${f(x)}" cy="${f(top)}" rx="2.4" ry="1" fill="none" stroke="#8e6a42" stroke-width="0.5"/>`
+    }
+  } else if (id === 'fence') {
+    for (const [x, y] of bedEdge(8)) {
+      const h = 15 + r() * 4, top = y + 3 - h
+      const tone = pick(r, ['#b7b05c', '#a3ab50', '#c5b868'])
+      s += `<rect x="${f(x - 3)}" y="${f(top)}" width="6" height="${f(h)}" rx="2" fill="${tone}" stroke="#5e6a2a" stroke-width="0.5"/><rect x="${f(x - 3)}" y="${f(top + h * 0.45)}" width="6" height="1" fill="#5e6a2a" opacity="0.6"/><ellipse cx="${f(x)}" cy="${f(top + 0.8)}" rx="2.3" ry="1" fill="#efe6a8"/>`
+    }
+  }
+  return s
+}
+
+export function scene(wearing: Wearing) {
+  const lawn = LOOK_BY_ID[wearing.lawn].lawn!, soil = LOOK_BY_ID[wearing.soil].soil!
   const r = rng(7)
   const { cx: CX, cy: CY, rx: RX, ry: RY } = BED
   const inBed = (x: number, y: number, pad = 0) => ((x - CX) / (RX + pad)) ** 6 + ((y - CY) / (RY + pad)) ** 6 < 1
@@ -120,9 +172,9 @@ function build() {
   const X0 = -BLEED, W = VIEW.w + BLEED * 2
   let s = `<svg class="scene" viewBox="${X0} 0 ${W} ${VIEW.h}" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
   <defs>
-    <linearGradient id="bed-grass" x1="0" y1="0" x2="0.3" y2="1"><stop offset="0" stop-color="#6cbb4f"/><stop offset="1" stop-color="#4a973a"/></linearGradient>
-    <radialGradient id="bed-soil" cx="0.45" cy="0.35" r="0.8"><stop offset="0" stop-color="#5a3b25"/><stop offset="1" stop-color="#3b2618"/></radialGradient>
-    <linearGradient id="bed-mound" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a06f46"/><stop offset="0.45" stop-color="#7c5234"/><stop offset="1" stop-color="#553621"/></linearGradient>
+    <linearGradient id="bed-grass" x1="0" y1="0" x2="0.3" y2="1"><stop offset="0" stop-color="${lawn.grass[0]}"/><stop offset="1" stop-color="${lawn.grass[1]}"/></linearGradient>
+    <radialGradient id="bed-soil" cx="0.45" cy="0.35" r="0.8"><stop offset="0" stop-color="${soil.ground[0]}"/><stop offset="1" stop-color="${soil.ground[1]}"/></radialGradient>
+    <linearGradient id="bed-mound" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${soil.mound[0]}"/><stop offset="0.45" stop-color="${soil.mound[1]}"/><stop offset="1" stop-color="${soil.mound[2]}"/></linearGradient>
     <linearGradient id="bed-wall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c120a" stop-opacity="0.95"/><stop offset="1" stop-color="#1c120a" stop-opacity="0"/></linearGradient>
     <radialGradient id="bed-light" cx="0.22" cy="0.08" r="1"><stop offset="0" stop-color="#fff6d8" stop-opacity="0.2"/><stop offset="0.55" stop-color="#fff6d8" stop-opacity="0"/><stop offset="1" stop-color="#0b1a08" stop-opacity="0.35"/></radialGradient>
     <radialGradient id="bed-glow"><stop offset="0" stop-color="#ffd76a" stop-opacity="0.9"/><stop offset="1" stop-color="#ffd76a" stop-opacity="0"/></radialGradient>
@@ -133,8 +185,8 @@ function build() {
 
   // Lawn: broad light/dark patches, then blades.
   for (let i = 0; i < 33; i++)
-    s += `<ellipse cx="${f(X0 + r() * W)}" cy="${f(r() * 440)}" rx="${f(30 + r() * 50)}" ry="${f(14 + r() * 24)}" fill="${r() < 0.5 ? '#3c8230' : '#8ad065'}" opacity="0.2"/>`
-  const greens = ['#3f8a32', '#4c9a3b', '#5aab45', '#6cbb4f', '#7fcb5e', '#93d86f']
+    s += `<ellipse cx="${f(X0 + r() * W)}" cy="${f(r() * 440)}" rx="${f(30 + r() * 50)}" ry="${f(14 + r() * 24)}" fill="${r() < 0.5 ? lawn.patches[0] : lawn.patches[1]}" opacity="0.2"/>`
+  const greens = lawn.blades
   const blades: [number, string][] = []
   for (let i = 0; i < 2250; i++) {
     const x = X0 + r() * (W + 4) - 2, y = r() * 450
@@ -143,7 +195,7 @@ function build() {
   s += byDepth(blades)
 
   // Clusters of tiny wildflowers and a few stones.
-  const petals = ['#ffffff', '#fff3a8', '#ffd0e4', '#cfe0ff']
+  const petals = lawn.flowers
   for (let k = 0; k < 12; k++) {
     let cx: number, cy: number
     do {
@@ -165,16 +217,16 @@ function build() {
     s += `<ellipse cx="${x + 1}" cy="${y + 3}" rx="${w}" ry="${f(w * 0.6)}" fill="#1f3d16" opacity="0.45"/><ellipse cx="${x}" cy="${y}" rx="${w}" ry="${f(w * 0.62)}" fill="#a39f92"/><ellipse cx="${f(x - w * 0.3)}" cy="${f(y - w * 0.2)}" rx="${f(w * 0.45)}" ry="${f(w * 0.25)}" fill="#cbc8bc"/>`
 
   // The bed: cast shadow, soil, a dark band where the far wall faces us, and loose crumbs.
-  s += `<path d="${bed}" fill="#1c3312" opacity="0.55" filter="url(#bed-blur)" transform="translate(0 4)"/>`
+  s += `<path d="${bed}" fill="${lawn.shade}" opacity="0.55" filter="url(#bed-blur)" transform="translate(0 4)"/>`
   s += `<path d="${bed}" fill="url(#bed-soil)"/><g clip-path="url(#bed-clip)"><rect x="0" y="34" width="400" height="32" fill="url(#bed-wall)"/>`
   for (let i = 0; i < 520; i++) {
     const x = CX - RX + r() * RX * 2, y = CY - RY + r() * RY * 2
-    if (inBed(x, y)) s += `<ellipse cx="${f(x)}" cy="${f(y)}" rx="${f(0.6 + r() * 1.4)}" ry="${f(0.5 + r())}" fill="${pick(r, ['#24170d', '#6e4a2f', '#80583a'])}" opacity="0.7"/>`
+    if (inBed(x, y)) s += `<ellipse cx="${f(x)}" cy="${f(y)}" rx="${f(0.6 + r() * 1.4)}" ry="${f(0.5 + r())}" fill="${pick(r, soil.crumbs)}" opacity="0.7"/>`
   }
   s += '</g>'
 
   // Turf lip: a dark edge plus blades leaning over the soil, denser along the near edge.
-  s += `<path d="${bed}" fill="none" stroke="#3a7f2e" stroke-width="4"/>`
+  s += `<path d="${bed}" fill="none" stroke="${lawn.lip}" stroke-width="4"/>`
   const fringe: [number, string][] = []
   const edge = (u: number, k: number) => (1 - Math.abs(u) ** 6) ** (1 / 6) * k
   for (let k = 0; k < 330; k++) {
@@ -204,15 +256,13 @@ function build() {
       const gy = y0 + dy * GROW
       let d = `M${CX - 138} ${f(gy)}`
       for (let x = CX - 115; x <= CX + 138; x += 23) d += `Q${f(x - 11.5)} ${f(gy + (r() - 0.5) * 3)} ${x} ${f(gy + (r() - 0.5) * 1.5)}`
-      s += `<path d="${d}" fill="none" stroke="${dy === 10 ? '#b6875c' : '#462c1a'}" stroke-width="${dy === 10 ? 2.2 : 1.2}" stroke-linecap="round" opacity="${op}"/>`
+      s += `<path d="${d}" fill="none" stroke="${dy === 10 ? soil.groove[0] : soil.groove[1]}" stroke-width="${dy === 10 ? 2.2 : 1.2}" stroke-linecap="round" opacity="${op}"/>`
     }
     for (let k = 0; k < 48; k++) {
       const light = r() < 0.55, rr = 0.8 + r() * 2
-      s += `<ellipse cx="${f(CX - 140 + r() * 280)}" cy="${f(y0 + (6 + r() * 46) * GROW)}" rx="${f(rr * 1.3)}" ry="${f(rr)}" fill="${light ? '#a87a50' : '#4a301d'}" opacity="${light ? 0.8 : 0.6}"/>`
+      s += `<ellipse cx="${f(CX - 140 + r() * 280)}" cy="${f(y0 + (6 + r() * 46) * GROW)}" rx="${f(rr * 1.3)}" ry="${f(rr)}" fill="${light ? soil.clods[0] : soil.clods[1]}" opacity="${light ? 0.8 : 0.6}"/>`
     }
   }
 
-  return s + `<rect x="${X0}" width="${W}" height="${VIEW.h}" fill="url(#bed-light)" pointer-events="none"/></svg>`
+  return s + edging(wearing.edge) + `<rect x="${X0}" width="${W}" height="${VIEW.h}" fill="url(#bed-light)" pointer-events="none"/></svg>`
 }
-
-export const SCENE = build()

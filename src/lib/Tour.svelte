@@ -1,5 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte'
+  import ConfirmSheet from './ConfirmSheet.svelte'
   import { phaseOf } from './garden'
   import { app, prepTour, setTour, tourDid } from './store.svelte'
   import { TOUR_STEPS, type TourStep } from './tour'
@@ -67,7 +68,7 @@
     },
     'shop-visit': {
       title: 'The Garden Shop',
-      text: 'Spend your coins here on decorations, then tap a + on the lawn to place them. The fancy ones cost a lot, so keep studying and saving!',
+      text: 'Spend your coins here on decorations and upgrades, then tap a + on the lawn to place them. The Garden tab changes the lawn, soil and more. The fancy things cost a lot, so keep studying and saving!',
       screen: 'shop',
       next: 'Back to the garden',
     },
@@ -130,8 +131,11 @@
     else if (app.tour) tourDid(app.tour)
   }
 
+  let skipping = $state(false)
+
   function skip() {
-    if (confirm('Skip the tutorial? You can replay it from Stats.')) setTour(null)
+    skipping = false
+    setTour(null)
   }
 </script>
 
@@ -150,7 +154,7 @@
         <p>{typeof step.text === 'string' ? step.text : step.text()}</p>
       {/if}
       <div class="tour-row">
-        <button class="linkish" onclick={skip}>Skip tutorial</button>
+        <button class="linkish" onclick={() => (skipping = true)}>Skip tutorial</button>
         {#if dry}
           <button class="primary" onclick={() => setTour(null)}>Done</button>
         {:else if step.next}
@@ -159,4 +163,10 @@
       </div>
     </aside>
   {/key}
+{/if}
+
+{#if skipping}
+  <ConfirmSheet title="Skip the tutorial?" yes="Skip tutorial" no="Keep going" onYes={skip} onNo={() => (skipping = false)}>
+    <p class="dim">You can replay it from Stats.</p>
+  </ConfirmSheet>
 {/if}

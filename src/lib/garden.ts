@@ -30,6 +30,7 @@ export const GROW_COINS = 10
 export const WEED_COINS = 5
 export const WEED_BONUS_XP = 5
 export const SKIP_COST = 100
+export const HINT_COST = 5 // reveals a kanji's readings during a question
 
 // Once this long after the last one was collected, the next ant to cross the lawn carries a coin.
 export const ANT_COIN_EVERY_MS = 60 * 60 * 1000
