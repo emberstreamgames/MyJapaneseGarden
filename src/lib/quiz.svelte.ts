@@ -1,6 +1,7 @@
-import { ITEMS, type Deck, type Item } from '../data/items'
-import { REVIEW_MAX } from './garden'
-import { app, buyHint, poolFor, record, save } from './store.svelte'
+import { EXTRA_CARDS, ITEMS, type Deck, type Item } from '../data/items'
+import { REVIEW_MAX, TEND_XP } from './garden'
+import { app, buyHint, inChapters, newLeft, record, save, studyPool } from './store.svelte'
+import { pickCard } from './srs'
 import * as sfx from './sfx'
 
 export type Kind = 'choice' | 'type'
@@ -46,13 +47,19 @@ export class Quiz {
   reviewing = $state(false) // the round after a quiz that asks misses again
   reviewTotal = $state(0)
   reviewDone = $state(0)
+  stronger = $state(0) // right answers on cards already met
+  met = $state(0) // cards seen for the first time
 
   private deckOf: () => Deck
+  private cards?: () => Item[] | undefined
   private lastId = ''
   private n = 0
+  private asked = new Set<string>() // cards asked since the pool last ran out
 
-  constructor(deckOf: () => Deck) {
+  // `cards` replaces the deck's pool with a fixed list, which may mix decks (Tend weak words).
+  constructor(deckOf: () => Deck, cards?: () => Item[] | undefined) {
     this.deckOf = deckOf
+    this.cards = cards
   }
 
   get deck(): Deck {
@@ -60,26 +67,18 @@ export class Quiz {
   }
 
   get pool(): Item[] {
-    return poolFor(this.deck)
+    return this.cards?.() ?? studyPool(this.deck)
   }
 
   // A kanji's readings give it away, so they cost coins until the question is answered.
   get hintLocked(): boolean {
-    return this.current?.type === 'kanji' && !this.revealed && !this.result
+    return this.current?.type === 'kanji' && !this.current.side && !this.revealed && !this.result
   }
 
   revealHint() {
     if (!this.hintLocked || !buyHint()) return
     this.revealed = true
     if (!app.muted) sfx.coin()
-  }
-
-  // Items that are new or often missed come up more often.
-  private weight(it: Item) {
-    const s = app.stats[it.id]
-    if (!s || s.c + s.w === 0) return 3
-    const missRate = (s.w + 0.5) / (s.c + s.w + 1)
-    return 1 + missRate * 4 + (s.streak === 0 ? 1 : 0)
   }
 
   get reviewLeft(): number {
@@ -97,21 +96,20 @@ export class Quiz {
   next() {
     if (this.reviewing) return this.ask(this.missed[this.reviewDone].item)
     const pool = this.pool
-    const items = pool.length > 1 ? pool.filter((i) => i.id !== this.lastId) : pool
-    if (!items.length) {
+    const now = Date.now()
+    const pickNext = () => pickCard(pool, app.stats, this.asked, newLeft(now), now)
+    let pick = pickNext()
+    // Everything's been asked: go round again, without repeating the card just shown.
+    if (!pick) {
+      this.asked.clear()
+      if (pool.length > 1) this.asked.add(this.lastId)
+      pick = pickNext()
+    }
+    if (!pick) {
       this.current = null
       return
     }
-    const total = items.reduce((a, i) => a + this.weight(i), 0)
-    let r = Math.random() * total
-    let pick = items[items.length - 1]
-    for (const it of items) {
-      r -= this.weight(it)
-      if (r <= 0) {
-        pick = it
-        break
-      }
-    }
+    this.asked.add(pick.id)
     this.ask(pick)
   }
 
@@ -122,22 +120,23 @@ export class Quiz {
     this.result = null
     this.picked = ''
     this.revealed = false
-    const kinds: Kind[] = app.mode === 'mix' ? ['choice', 'type'] : [app.mode]
+    // Japanese can't be typed on every keyboard, so harder versions are always multiple choice.
+    const kinds: Kind[] = pick.side ? ['choice'] : app.mode === 'mix' ? ['choice', 'type'] : [app.mode]
     this.kind = kinds[Math.floor(Math.random() * kinds.length)]
     if (this.kind === 'choice') {
       this.makeOptions(pick)
       // Too few distinct answers to make a real choice: ask for a typed answer instead.
-      if (this.options.length < 2) this.kind = 'type'
+      if (this.options.length < 2 && !pick.side) this.kind = 'type'
     }
   }
 
   private makeOptions(it: Item) {
-    const deck = this.deck
+    const all = (it.side ? EXTRA_CARDS : ITEMS).filter((i) => i.type === it.type && i.side === it.side)
     // skip rows sharing any accepted answer (家 "home; house" vs うち "home; house; my place"): both would be right
     const distinct = (i: Item) => i.back !== it.back && !i.answers.some((a) => it.answers.includes(a))
-    const others = [...new Set(ITEMS.filter((i) => i.type === deck && distinct(i)).map((i) => i.back))]
+    const others = [...new Set(all.filter(distinct).map((i) => i.back))]
     // prefer distractors from the enabled pool so choices stay in scope
-    const inScope = [...new Set(this.pool.filter(distinct).map((i) => i.back))]
+    const inScope = [...new Set(all.filter((i) => distinct(i) && inChapters(i)).map((i) => i.back))]
     const source = inScope.length >= 3 ? inScope : others
     const picks = source.sort(() => Math.random() - 0.5).slice(0, 3)
     this.options = [...picks, it.back].sort(() => Math.random() - 0.5)
@@ -154,7 +153,10 @@ export class Quiz {
       if (ok && m) m.fixed = true
     } else {
       this.answered++
+      const seen = !!app.stats[id]
       record(id, ok)
+      if (!seen) this.met++
+      else if (ok) this.stronger++
       if (!ok && !this.missed.some((m) => m.item.id === id)) this.missed.push({ item: this.current, fixed: false })
     }
     if (ok) {
@@ -163,7 +165,7 @@ export class Quiz {
         this.session.right++
         if (this.combo > app.best) app.best = this.combo
         if (this.combo > this.bestCombo) this.bestCombo = this.combo
-        const amount = 10 + Math.min(this.combo, 10) * 2
+        const amount = this.cards?.() ? TEND_XP : 10 + Math.min(this.combo, 10) * 2
         app.xp += amount
         this.gain = { id: ++this.n, amount }
       }

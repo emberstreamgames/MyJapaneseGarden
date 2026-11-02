@@ -103,6 +103,7 @@
         <h2>You reached level {to}</h2>
         <p class="lvlup-cheer"><b lang="ja">{cheer.ja}</b> <span class="dim">({cheer.gloss})</span></p>
         <p>{cheer.line}</p>
+        <p class="lvlup-seed">🌱 +{to - from} seed {to - from === 1 ? 'packet' : 'packets'}: choose the bloom colour of a new plant</p>
         <button class="primary big-btn" bind:this={ok} onclick={onClose}>OK</button>
       </div>
     {/if}

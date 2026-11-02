@@ -12,6 +12,10 @@ export const SEEDED = 1
 export const BLOOMED = STAGE_NAMES.length - 1
 
 export const QUIZ_LENGTH = 10
+// Tend weak words: deliberately short and rationed, so extra practice doesn't turn into cramming.
+export const TEND_LENGTH = 7
+export const TEND_PER_DAY = 2
+export const TEND_XP = 5 // per right answer, flat
 export const REVIEW_MAX = 5 // misses asked again after a watering or grooming quiz
 export const WATER_BONUS_XP = 50
 export const GROOM_BONUS_XP = 30
@@ -40,6 +44,7 @@ export const ANT_COINS = 5
 // Once this long after the last visitor was thanked, a butterfly or bird lands in the garden with a word to review.
 export const VISITOR_EVERY_MS = 20 * 60 * 1000
 export const VISITOR_COINS = [1, 3] // inclusive range
+export const QUIZ_VISITORS = 3 // a finished quiz brings a visitor, this many times a day
 
 export const WEED_EVERY_MS = 2 * 60 * 60 * 1000
 export const MAX_WEEDS = 6

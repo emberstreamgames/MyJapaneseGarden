@@ -10,16 +10,18 @@
   import PressFlower from './lib/PressFlower.svelte'
   import Shop from './lib/Shop.svelte'
   import Stats from './lib/Stats.svelte'
+  import Tend from './lib/Tend.svelte'
   import Tour from './lib/Tour.svelte'
   import { N5, type Lesson } from './data/build'
   import { app, level, levelHold, quizState, setTour, toggleLesson, tourDid, type Preserved } from './lib/store.svelte'
 
-  type Tab = 'garden' | 'shop' | 'collection' | 'hiragana' | 'katakana' | 'kanji' | 'vocab' | 'grammar' | 'stats'
+  type Tab = 'garden' | 'shop' | 'collection' | 'tend' | 'hiragana' | 'katakana' | 'kanji' | 'vocab' | 'grammar' | 'stats'
   // `hidden` leaves a screen out of the menu. The free practice decks are off for now.
   const tabs: { id: Tab; label: string; hidden?: boolean }[] = [
     { id: 'garden', label: 'Garden' },
     { id: 'shop', label: 'Garden Shop' },
     { id: 'collection', label: 'Collection' },
+    { id: 'tend', label: 'Tend weak words' },
     { id: 'hiragana', label: 'ひらがな', hidden: true },
     { id: 'katakana', label: 'カタカナ', hidden: true },
     { id: 'kanji', label: '漢字', hidden: true },
@@ -64,7 +66,7 @@
   const lessons: Lesson[] = [...Array.from({ length: 13 }, (_, i) => i), N5]
   // The chips choose vocab and kanji chapters, so only the screens they affect show them, and not
   // during a garden quiz, whose pool shouldn't change under it.
-  const chips = $derived(!quizState.open && tab !== 'collection' && tab !== 'shop' && tab !== 'hiragana' && tab !== 'katakana')
+  const chips = $derived(!quizState.open && tab !== 'collection' && tab !== 'shop' && tab !== 'tend' && tab !== 'hiragana' && tab !== 'katakana')
 
   // Celebrate each new level. `seen` starts at the loaded level so opening the app doesn't count,
   // and follows a reset back down. A quiz in progress holds the popup back (levelHold); after that a
@@ -111,6 +113,8 @@
     <Shop {placeAt} onPlaced={() => (placeAt = null)} onGarden={() => go('garden')} />
   {:else if tab === 'collection'}
     <Collection {fresh} />
+  {:else if tab === 'tend'}
+    <Tend onDone={() => go('garden')} />
   {:else}
     <Flashcards deck={tab} />
   {/if}

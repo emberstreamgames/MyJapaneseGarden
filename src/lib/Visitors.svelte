@@ -11,10 +11,10 @@
   import { app, collectVisitor, meetCreature, record, reminderItem, tourDid, visitorReady } from './store.svelte'
 
   // Garden visitors. Once a visitor is due (garden.ts visitorDue), a creature (creatures.ts) arrives
-  // and settles: fliers often on an open flower, the rest on the lawn. Tapping it logs it in the
-  // collection and opens a card with a word to recall: the player reveals the meaning, says how they
-  // did (recorded like a quiz answer), and collects a few coins. One that isn't thanked leaves after
-  // a while and a later one comes instead.
+  // and settles: fliers often on an open flower, the rest on the lawn. Tapping it opens a card with a
+  // word to recall: the player reveals the meaning, says how they did (recorded like a quiz answer),
+  // and collects a few coins. Answering either way befriends the creature for the collection. One
+  // that isn't thanked leaves after a while and a later one comes instead.
 
   type Pt = { x: number; y: number }
   interface Visitor {
@@ -25,8 +25,6 @@
     from: Pt
     state: 'in' | 'perched' | 'out'
     note: boolean // still carrying its word, rolled up; handed over once thanked
-    met: boolean // logged in the collection, so tapping it twice counts once
-    first: boolean // and it was new there
   }
 
   // Flight time in ms, arriving and leaving.
@@ -37,7 +35,8 @@
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
 
   let visitor = $state<Visitor | null>(null)
-  let card = $state<{ v: Visitor; item: Item | null; coins: number; shown: boolean } | null>(null)
+  // `friend`: this answer befriended a new creature, so the card stays open to say so.
+  let card = $state<{ v: Visitor; item: Item | null; coins: number; shown: boolean; friend: boolean } | null>(null)
   let gain = $state<{ id: number; x: number; y: number; coins: number } | null>(null)
   let n = 0
   let el: SVGGElement | undefined
@@ -63,12 +62,12 @@
   function spawn() {
     // During the tutorial, visitors wait for their own step.
     if (document.hidden || visitor || card || !visitorReady() || (app.tour && app.tour !== 'visitor')) return
-    const { creature, look } = rollCreature(Math.random(), Math.random())
+    const { creature, look } = rollCreature(Math.random(), Math.random(), (key) => !!app.creatures[key])
     const info = CREATURES[creature]
     const flowers = app.garden.flatMap((p, i) => (p && p.stage >= BLOOMED - 1 ? [i] : []))
     const at = info.flowers && flowers.length && Math.random() < 0.85 ? flowerTop(pick(flowers)) : lawn()
     const from = info.move === 'hop' ? offLawn(at) : { x: Math.min(VIEW.w + 40, Math.max(-40, at.x + rand(-180, 180))), y: -30 }
-    visitor = { id: ++n, creature, look, at, from, state: 'in', note: true, met: false, first: false }
+    visitor = { id: ++n, creature, look, at, from, state: 'in', note: true }
   }
 
   $effect(() => {
@@ -149,20 +148,26 @@
   function tap() {
     const v = visitor
     if (!v || v.state === 'out') return
-    if (!v.met) {
-      v.met = true
-      v.first = meetCreature(creatureKey(v.creature, v.look))
-    }
-    card = { v, item: reminderItem(), coins: visitorCoins(Math.random()), shown: false }
+    card = { v, item: reminderItem(), coins: visitorCoins(Math.random()), shown: false, friend: false }
     if (!app.muted) sfx[CREATURES[v.creature].call]()
   }
 
-  // `knew` is the player's own verdict on the word, if the card had one.
+  // `knew` is the player's own verdict on the word, if the card had one. Either answer befriends:
+  // only rewarding "Got it!" would reward fibbing.
   function thank(knew?: boolean) {
     if (!card) return
-    const { coins, item } = card
-    card = null
+    const { v, item } = card
     if (item && knew !== undefined) record(item.id, knew)
+    if (meetCreature(creatureKey(v.creature, v.look))) {
+      card.friend = true
+      if (!app.muted) sfx.fanfare()
+    } else finish()
+  }
+
+  function finish() {
+    if (!card) return
+    const { coins } = card
+    card = null
     if (!collectVisitor(coins)) return leave()
     tourDid('visitor')
     if (!app.muted) sfx.coin()
@@ -223,8 +228,8 @@
       <svg class="vart" viewBox={info.view} aria-hidden="true"><g class="visitor {info.move} {c.v.creature} perched"><CreatureSprite creature={c.v.creature} look={c.v.look} /></g></svg>
       <h2>{aLabel(c.v.creature)} stopped by!</h2>
       <p class="variant">{findLook(c.v.creature, c.v.look).name} · <span lang="ja">{info.jp}</span></p>
-      {#if c.v.first}<p class="discovery">✨ New! Added to your collection</p>{/if}
-      {#if c.item}
+      {#if c.friend}<p class="discovery">✨ New friend! Added to your collection</p>{/if}
+      {#if c.item && !c.friend}
         <p class="dim">{c.shown ? 'It brought you this word:' : 'It brought you a word. Do you remember it?'}</p>
         <div class="vword">
           <div class="big" class:long={c.item.front.length > 4} lang="ja">{c.item.front}</div>
@@ -234,7 +239,9 @@
         </div>
       {/if}
       <p class="coins">and a little gift: +{c.coins} 🪙</p>
-      {#if !c.item}
+      {#if c.friend}
+        <button class="primary big-btn" onclick={finish}>ありがとう!</button>
+      {:else if !c.item}
         <button class="primary big-btn" onclick={() => thank()}>ありがとう! Thank you</button>
       {:else if !c.shown}
         <button class="primary big-btn" onclick={() => (c.shown = true)}>Show meaning</button>

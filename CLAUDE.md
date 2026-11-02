@@ -1,15 +1,16 @@
-# Genki Grow
+# My Japanese Garden
 
-A Japanese study app built around the Genki I textbook. There's flashcard practice for each deck, plus a garden game: plants grow when you finish 10-question quizzes. Everything runs in the browser and progress is saved to `localStorage`. There's no backend.
+A Japanese study app whose chapters currently follow the Genki I textbook. There's flashcard practice for each deck, plus a garden game: plants grow when you finish 10-question quizzes. Everything runs in the browser and progress is saved to `localStorage`. There's no backend.
 
 **This is a Svelte web app, not a MapleStory Worlds (MSW) project.**
 
 ## Stack and commands
 
-- Svelte 5 (runes: `$state`, `$derived`, `$effect`, `$props`), TypeScript, Vite. No router, no UI library, no test framework yet.
+- Svelte 5 (runes: `$state`, `$derived`, `$effect`, `$props`), TypeScript, Vite, ts-fsrs for review scheduling. No router, no UI library.
 - `npm run dev`: dev server on port 5173. The browser console shows content warnings from `items.ts`.
 - `npm run check`: svelte-check plus tsc. Run it after changes; it should report 0 errors and 0 warnings.
-- `npm run build`: production build into `dist/`, with base `/GenkiGrow/` for GitHub Pages (`BASE_PATH=/` overrides it). `npm run preview` serves it at `localhost:4173/GenkiGrow/`.
+- `npm test`: Vitest, for the pure rules (`srs.test.ts`, `garden.test.ts`). CI runs it too.
+- `npm run build`: production build into `dist/`, with base `/MyJapaneseGarden/` for GitHub Pages, which must match the repo name (`BASE_PATH=/` overrides it). `npm run preview` serves it at `localhost:4173/MyJapaneseGarden/`.
 - `Launchers/Windows/*.bat` and `Launchers/Mac/*.command` start and stop the dev server by double-click. The start scripts install dependencies on first run, print the LAN URL for phones, and open the browser. There's no Linux equivalent yet.
 
 ## Layout
@@ -35,7 +36,10 @@ A Japanese study app built around the Genki I textbook. There's flashcard practi
 | `PressFlower.svelte` | The scene between Preserve and the Collection: the flower grows, is snipped from its stem, and is shut in a book. Mounted in `App`, tap to skip, left out under reduced motion. The reward is saved before it starts |
 | `LevelUp.svelte` | Full-screen level-up: the old number shakes and shrinks, then pops into the new one with confetti. `App` shows it whenever `level()` rises |
 | `Visitors.svelte` | Butterflies and birds: one lands when a visitor is due, and tapping it opens a card with a word to recall: reveal the meaning, say how you did, collect coins |
-| `src/lib/quiz.svelte.ts` | `Quiz` class shared by free practice and garden quizzes (weighted picks, choice/type, the review round), and `accepted`, the typed-answer check |
+| `src/lib/quiz.svelte.ts` | `Quiz` class shared by free practice and garden quizzes (choice/type, the review round), and `accepted`, the typed-answer check |
+| `src/lib/srs.ts` | Pure spaced-repetition rules: each card's FSRS state, `pickCard` (what a quiz asks next), `seedSrs` (old saves), `weakest` |
+| `src/lib/roll.ts` | Weighted picks; `FAVOUR_NEW` makes what isn't in a collection yet twice as likely |
+| `Tend.svelte` | Tend weak words: the pre-screen for a short session on the shakiest cards, run through `GardenQuiz` |
 | `src/lib/creatures.ts`, `CreatureSprite.svelte`, `CreatureBook.svelte` | Visitor creatures: the catalog of 10 creatures and their looks plus the pure collection rules, the art for every creature and look (a `<g>` to put inside an `<svg>`), and the Creatures tab of the Collection |
 | `creatures.html`, `src/creatures/` | Dev-only preview of every creature and look (`/creatures.html`; not in the build). Tap to like, then copy the list |
 | `src/lib/plants.ts`, `PlantSprite.svelte` | SVG plant art per species and stage |
@@ -60,7 +64,7 @@ A Japanese study app built around the Genki I textbook. There's flashcard practi
 - Confirmations use `ConfirmSheet`, never `confirm()`, `alert()` or `prompt()`.
 - Item ids come from their content (`v-<jp>-<meaning>`, `n5-<jp>-<meaning>`, `j-<kanji>`, `g-<sentence>`, `h-`/`k-<kana>`), and stats are stored under them. Changing a row's prompt or main meaning resets its stats.
 - Typed answers are stored trimmed and lowercased. Grammar rows should include romaji alternatives. For vocab and kanji, `accepted` also passes an answer without its parentheses or leading "to ", so "to wear (on the body)" needs no extra row values.
-- Saved data: key `genki-study-v1`, `SAVE_VERSION = 9`. Loaded or imported garden data always goes through `normalizeGarden`. If the save shape changes, bump the version and migrate in `repair()` (used by both `load()` and `importData()`).
+- Saved data: key `genki-study-v1` (kept through the rename, so saves carry over), `SAVE_VERSION = 10`. Loaded or imported garden data always goes through `normalizeGarden`. If the save shape changes, bump the version and migrate in `repair()` (used by both `load()` and `importData()`).
 - Code style: no semicolons, single quotes, 2-space indent, short comments that explain why.
 
 ## Game rules (quick reference)
@@ -73,7 +77,12 @@ A Japanese study app built around the Genki I textbook. There's flashcard practi
 - Kanji hints: in every quiz, a kanji's readings stay hidden until the question is answered, or until the player pays `HINT_COST` (5) coins during it. Vocab readings and grammar translations stay free.
 - Weeds: one every 2 h (`WEED_EVERY_MS`), at most 6, caught up from `weedAt` on load. Tapping one shows a pre-screen naming the question's deck (Start or ✕), then asks a single question from that deck, picked at random among decks with items in the pool. A correct answer pulls it for 5 coins and 5 bonus XP; a wrong one leaves it and swaps in a new question.
 - Chapters: the chips choose which lessons' vocab, kanji and grammar are in the pool. Hiragana and katakana are always fully in it (`poolFor`).
-- Mastery: a card is mastered at a streak of `MASTERY_STREAK` (5). Stats shows a ring per deck over the cards in the pool.
+- Scheduling (`srs.ts`): every recorded answer updates the card's FSRS state; right is Good, wrong is Again. A quiz asks due cards first (most overdue), then new cards in pool order up to `NEW_PER_DAY` (10, across all decks), then the cards closest to due, and goes past the cap only when nothing else is left, so a plant can always be watered. A quiz doesn't repeat a card until the pool runs out. Saves from before version 10 are seeded from their right/wrong counts, with a streak of 5 landing at 32 days.
+- Mastery: a card is mastered at `MASTERY_DAYS` (21) of stability, so it can drop back out after a miss. Stats shows a ring per deck over the cards in the pool. Mastering a card unlocks its harder version (`EXTRA_CARDS`, `side`): English to Japanese for vocab, readings for kanji. These are scheduled separately, always multiple choice, and come ahead of new cards (`studyPool`).
+- Tend weak words: up to `TEND_LENGTH` (7) of the shakiest cards, `TEND_PER_DAY` (2) sessions a day, counted at Start. `TEND_XP` (5) per right answer, with no combo, plant, streak or review round. The summary tells the player to take a break: this must not become cramming.
+- Seed packets: one per level past the first (`seedPackets`, derived from XP and `seedsUsed`). Planting with a packet lets the player choose the bloom colour, or keep the packet with Surprise me.
+- Rolls favour the new: blooms and visitors not yet found are `FAVOUR_NEW` (2) times as likely as found ones.
+- Garden wording: "You can read N words" counts vocab with `KNOWN_DAYS` (7) of stability. Once today's study is done, the status says one plant is enough.
 - Ants: a line of 1-3 crosses the lawn every 15-40 s while the garden is open, some carrying crumbs or food. Once `ANT_COIN_EVERY_MS` (1 h) has passed since the last ant coin was collected (`antCoinAt`), the next lead ant carries a coin; tapping it gives 5 coins. An untapped coin ant leaves the coin for a later ant. With reduced motion, only the coin ant shows, standing still.
 - A deck's plants unlock once it has at least `MIN_DECK_SIZE` (10) items.
 - Perfect quiz: 10/10 on a watering or grooming quiz gives +15 coins (`PERFECT_COINS`). The summary also shows the best combo of the run.
@@ -86,11 +95,13 @@ A Japanese study app built around the Genki I textbook. There's flashcard practi
 - Shiny rock: a gift-only decoration from the tutorial (`gift: true`, so it's left out of `SHOP_DECOR` and `buyDecor` refuses it). `giftRock` gives it once, even on a replay.
 - Tutorial: new saves start at `tour: 'hello'`; saves from before version 6 skip it. Steps: welcome, HUD, visitor, ant, weed, plant (the sheet closes without offering water), shop (the first + tapped holds a gift: a shiny rock, placed on that spot, then a button to the shop), inside the shop, tap the 💧, take the quiz. During it, visitors and coin ants only come on their own steps (called in at once; the coin ant stops halfway along its lane until tapped), and the weed asks hiragana. `prepTour` makes sure each step's target exists. Closing the plot sheet on the last step goes back to the 💧 step. Replay from the menu or Stats; skip from the card.
 - Level-ups: a popup celebrates each new level (it plays the level-up sound; the quiz no longer does). It waits while a quiz holds `levelHold` (`holdLevelUps()`): a garden or weed quiz until it closes, free practice until Next is pressed.
-- Visitors: once `VISITOR_EVERY_MS` (20 min) has passed since the last one was thanked, a creature comes, with an even chance of each creature and then of each of its looks (`rollCreature`). Butterflies, dragonflies, bees and ladybugs usually land on a flower; birds and owls swoop to the lawn; frogs, rabbits, cats and tanuki hop in from the side. It carries a rolled-up note until thanked. Tapping it shows a vocab word with its meaning hidden (missed words come up more often). The player reveals it and answers "How did you do?" with Got it! or Still learning, which is recorded like a quiz answer, and either gives 1-3 coins. Closing the card records nothing. One that isn't thanked leaves after 2.5 min, and a later one comes instead.
-- Creature collection: tapping a visitor logs that creature and look in `creatures` (`meetCreature`), unlocking it on the Collection's Creatures tab, even if the card is closed without thanking. Keys use look ids, so looks can be cut without shifting saves; `normalizeCreatures` drops entries for cut looks. There's no coin reward for a new one.
+- Visitors: once `VISITOR_EVERY_MS` (20 min) has passed since the last one was thanked, a creature comes, with an even chance of each creature and then of each of its looks (`rollCreature`). Butterflies, dragonflies, bees and ladybugs usually land on a flower; birds and owls swoop to the lawn; frogs, rabbits, cats and tanuki hop in from the side. It carries a rolled-up note until thanked. Tapping it shows a vocab word with its meaning hidden (missed words come up more often). The player reveals it and answers "How did you do?" with Got it! or Still learning, which is recorded like a quiz answer, and either gives 1-3 coins and befriends the creature. Closing the card records nothing. Each finished watering or grooming quiz also brings a visitor, `QUIZ_VISITORS` (3) times a day. One that isn't thanked leaves after 2.5 min, and a later one comes instead.
+- Creature collection: answering a visitor's note logs that creature and look in `creatures` (`meetCreature`), unlocking it on the Collection's Creatures tab. Closing the card without answering doesn't. Keys use look ids, so looks can be cut without shifting saves; `normalizeCreatures` drops entries for cut looks. There's no coin reward for a new one.
 
-## Current status (2026-10-30)
+## Current status (2026-10-31)
 
+- Renamed to My Japanese Garden, at `/MyJapaneseGarden/`, matching the GitHub repo. Chapter numbers still follow Genki I; moving to original units was deferred.
+- Added FSRS scheduling with a daily new-card cap, harder card versions, Tend weak words, befriending creatures by answering their notes, visitors brought by quizzes, seed packets, rolls favouring the new, a plant strip in quizzes, credits and `navigator.storage.persist()`.
 - Added the post-quiz review round, auto-advance on right answers, a summary with the plant and missed words, recall on visitor cards, and looser typed answers. The chapter chips no longer show during quizzes. Checked in headless Chromium and WebKit (phone size), including reduced motion and the tutorial. The sounds were not checked by ear.
 - Added the creature collection, 8 new creatures and 65 looks in all, chosen on `/creatures.html` (the yellow ladybug was cut).
 - Growing a plant now happens on the garden with a sunbeam (`GrowBeam`) instead of in the plot sheet, and the debug tools moved from Stats to the 🛠 panel (`DevTools`), which adds any coin amount and a per-plot Skip timer. Checked in headless Chromium and WebKit (phone emulation), including reduced motion. The sounds were not checked by ear.
@@ -98,7 +109,7 @@ A Japanese study app built around the Genki I textbook. There's flashcard practi
 - Added the garden shop and decorations, flying coins, the level-up popup, mastery rings on Stats, the always-visible garden quiz combo, glossed wrong-answer encouragement with an explanation of the answer, and notes carried by visitors. Kana ignore the chapter chips. Checked in headless Chromium and WebKit (iPhone emulation); dragging decorations with touch was only checked with a mouse.
 - Fixed: ants stood still on iOS because WebKit ignores keyframes passed as a Svelte `$state` proxy. Pass `$state.snapshot(...)` (or a plain array) to `el.animate`.
 - Streaks, the welcome-back card, the pressed-flower collection with Preserve, perfect-quiz bonuses, and butterfly/bird visitors were added. They were checked in a headless browser, except the quiz summary's streak and perfect lines.
-- Type-check and build are clean. There are no tests.
+- Type-check, tests and build are clean. Tests cover the pure rules only.
 - Hiragana and katakana are complete.
 - Kanji: all 80 JLPT N5 kanji, in Genki lessons 3-10. Genki's N4+ Reading & Writing kanji (65 more) are not added.
 - Vocab: Genki lessons 1-3 so far, plus N5 Prep (565 words covering most of the ~670-word Waller N5 list).
@@ -107,7 +118,6 @@ A Japanese study app built around the Genki I textbook. There's flashcard practi
 
 ## Known issues and planned work
 
-1. Add the remaining Genki I vocab (lessons 0, 4-12) and grammar content, following `docs/CONTENT.md`. The research notes have about 45 draft grammar items that need a native-speaker check.
+1. Adding Genki I vocab is paused: don't add more lesson lists until the curriculum and licensing are decided (see the licensing notes in `research_notes/`). Grammar content has about 45 draft items that need a native-speaker check.
 2. `importData()`/`load()` repair the garden, weeds, streak and collection. Also check `lessons`, `xp`, `best`, and `stats`.
-3. Add unit tests (for example Vitest) for `garden.ts`, starting with phases, cooldown edge cases, and `normalizeGarden`.
-4. Replace the stock Vite `README.md` and rename the package from `japanesestudyapp`.
+3. Replace the stock Vite `README.md` and rename the package from `japanesestudyapp`.

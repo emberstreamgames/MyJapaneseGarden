@@ -3,14 +3,14 @@
   import { ALL_CREATURES, CREATURES, CREATURE_LIST, creatureKey } from './creatures'
   import { app } from './store.svelte'
 
-  // The creature book. Every creature and look shows: a silhouette until a visitor of it is tapped.
+  // The creature book. Every creature and look shows: a silhouette until a visitor of it is befriended.
   const found = $derived(ALL_CREATURES.filter((c) => app.creatures[c.key]).length)
 </script>
 
 <h2>Creatures</h2>
-<p class="dim">Tap a visitor in the garden to add it here.</p>
+<p class="dim">Answer a visitor's note in the garden to befriend it.</p>
 <div class="cprog">
-  <div><b>{found}</b>/{ALL_CREATURES.length}<span>seen</span></div>
+  <div><b>{found}</b>/{ALL_CREATURES.length}<span>befriended</span></div>
 </div>
 <div class="xpbar cbar" aria-hidden="true"><div style="width:{(found / ALL_CREATURES.length) * 100}%"></div></div>
 
@@ -26,13 +26,13 @@
     <div class="cards">
       {#each info.looks as l (l.id)}
         {@const entry = app.creatures[creatureKey(c, l.id)]}
-        <div class="fcard" class:seen={entry} class:hidden={!entry} aria-label={entry ? undefined : 'Not yet seen'}>
+        <div class="fcard" class:seen={entry} class:hidden={!entry} aria-label={entry ? undefined : 'Not yet befriended'}>
           <div class="paper">
             <svg class="creature-art" viewBox={info.view} aria-hidden="true"><CreatureSprite creature={c} look={entry ? l.id : info.looks[0].id} /></svg>
           </div>
           {#if entry}
             <b>{l.name}</b>
-            <span class="dim">Seen {entry.count}×</span>
+            <span class="dim">Met {entry.count}×</span>
           {:else}
             <b>???</b>
           {/if}

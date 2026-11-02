@@ -95,6 +95,14 @@ header h1 { margin: 0; }
 .summary h2 { color: var(--text); }
 .summary p { margin: 0.4em 0; }
 .summary button { margin-top: 12px; }
+.quiz-plant { display: flex; align-items: flex-end; justify-content: center; gap: 12px; height: 62px; margin-bottom: 8px; }
+.quiz-plant .sprite { width: 62px; height: 62px; }
+.quiz-plant .can { width: 72px; height: 54px; }
+.can-line { fill: none; stroke: var(--dim); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.can-water { fill: #5bb6ff; transition: y 0.3s, height 0.3s; }
+.quiz-scissors { font-size: 1.7rem; }
+@media (max-height: 680px) { .quiz-plant { display: none; } }
+.rest-note { color: var(--text); font-weight: 600; }
 .sum-plant { width: 130px; height: 150px; margin: 0 auto; }
 .sum-plant svg { display: block; width: 100%; height: 100%; }
 .sum-missed { max-width: 340px; margin: 14px auto 0; text-align: left; }
@@ -130,6 +138,7 @@ header h1 { margin: 0; }
 
 .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; }
 .choice { font-size: 1.3rem; padding: 14px; }
+.choice[lang='ja'] { font-size: 1.05rem; line-break: strict; }
 .choice.ok { background: var(--good); border-color: var(--good); color: #062a1d; font-weight: 700; }
 .choice.no { background: var(--bad); border-color: var(--bad); color: #330610; }
 
@@ -409,6 +418,14 @@ input:focus { outline: none; border-color: var(--accent); }
 .vword .big { font-size: clamp(2.6rem, 14vw, 4rem); }
 .vword .big.long { font-size: clamp(1.6rem, 7vw, 2.4rem); }
 .vword .answer { font-size: 1.4rem; }
+.gread { margin: 2px 0 0; text-align: center; color: var(--gold); font-size: 0.95rem; font-weight: 600; }
+.tend { text-align: center; padding: 24px 10px; }
+.lvlup-seed { color: var(--good); font-weight: 600; }
+.bloom-picks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 10px 0; }
+.bloom-pick { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px; font-size: 0.8rem; }
+.bloom-pick .flower-head { width: 56px; height: 56px; }
+.credits p { margin: 0.3em 0; }
+.credits a { color: inherit; }
 .vask { margin: 12px 0 0; font-weight: 700; }
 .vgrade { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 

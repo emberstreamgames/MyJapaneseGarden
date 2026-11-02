@@ -17,7 +17,7 @@ if not exist node_modules (
 )
 
 echo.
-echo Starting Genki Study...
+echo Starting My Japanese Garden...
 echo   This PC:   http://localhost:5173
 for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /C:"IPv4"') do echo   Phone/Mac: http://%%a:5173
 echo.

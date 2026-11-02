@@ -19,6 +19,9 @@
 
   let { away, onClose }: { away: Away; onClose: () => void } = $props()
 
+  // Safari can clear a site's saved data after a week away. A home-screen app is safe from that.
+  const iosTab = /iP(hone|ad|od)/.test(navigator.userAgent) && !('standalone' in navigator && navigator.standalone)
+
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
   onMount(() => {
@@ -53,6 +56,7 @@
       {/if}
       {#if !away.ready && !away.thirsty && !away.sprouted && !away.ant}<li>😴 Everything is resting peacefully</li>{/if}
     </ul>
+    {#if iosTab}<p class="dim">Tip: tap Share, then Add to Home Screen, so your garden stays safe.</p>{/if}
     <button class="primary big-btn" onclick={onClose}>Let's garden! 🌸</button>
   </div>
 </div>
