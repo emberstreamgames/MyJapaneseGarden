@@ -96,6 +96,7 @@ const SILVER = ['#6f7782', '#f4f7fa', '#a3abb5', '#ffffff', '#7f8792']
 const ROSE_GOLD = ['#9c5a55', '#ffd6cc', '#c98476', '#ffe9e2', '#a8655d']
 
 export const BLOOMS: Record<Species, Bloom[]> = {
+  starter: [],
   sakura: [
     { name: 'Snow Blush', look: (d) => ({ paints: [d.lin(['#ffffff', '#fff4f8', '#ffb3cc'])], center: '#ff4f87' }) },
     { name: 'Kanzan', look: () => ({ paints: ['#ff8fb8'], center: '#d9466f' }) },

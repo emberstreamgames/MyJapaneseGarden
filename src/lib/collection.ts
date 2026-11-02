@@ -1,5 +1,5 @@
 import { BLOOMS, bloomName } from './blooms'
-import { SPECIES, type Species } from './garden'
+import { GROWABLE, type Species } from './garden'
 
 // Pure rules for the pressed-flower collection. Every species/variant pair is one entry: it is
 // discovered the first time a plant of it blooms, and completed once one is preserved (grown,
@@ -17,7 +17,7 @@ export const flowerKey = (s: Species, variant: number) => `${s}:${variant}`
 export const flowerName = (s: Species, variant: number) => bloomName(s, variant) || 'Classic'
 
 // Every entry in display order: species as listed in SPECIES, original colours first.
-export const FLOWERS = (Object.keys(SPECIES) as Species[]).flatMap((species) =>
+export const FLOWERS = GROWABLE.flatMap((species) =>
   Array.from({ length: BLOOMS[species].length + 1 }, (_, variant) => ({ species, variant, key: flowerKey(species, variant) })),
 )
 

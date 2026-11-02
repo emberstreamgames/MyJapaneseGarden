@@ -1,10 +1,27 @@
 import { describe, expect, it } from 'vitest'
 import { BLOOMS, rollVariant } from './blooms'
 import { creatureKey, rollCreature } from './creatures'
-import { BLOOMED, COOLDOWN_MS, PLOT_COUNT, advance, canPreserve, completeQuiz, msUntilReady, normalizeGarden, phaseOf, plantSeed, skipRest } from './garden'
+import { FLOWERS } from './collection'
+import { BLOOMED, COOLDOWN_MS, PLOT_COUNT, STARTER, advance, canPreserve, completeQuiz, msUntilReady, normalizeGarden, phaseOf, plantSeed, plantStarter, skipRest, speciesFor, waterStarter } from './garden'
 import { FAVOUR_NEW, pickWeighted } from './roll'
 
 const T0 = 1_800_000_000_000
+
+describe('the starter plant', () => {
+  it('blooms with one watering and no wait, then needs grooming', () => {
+    const watered = waterStarter(plantStarter(), T0)
+    expect(phaseOf(plantStarter(), T0)).toBe('thirsty')
+    expect(phaseOf(watered, T0)).toBe('ready')
+    const grown = advance(watered, T0)!
+    expect(grown.stage).toBe(BLOOMED)
+    expect(phaseOf(grown, T0)).toBe('thirsty')
+  })
+
+  it("isn't offered for planting or kept in the collection", () => {
+    expect(speciesFor('hiragana')).not.toContain(STARTER)
+    expect(FLOWERS.some((f) => f.species === STARTER)).toBe(false)
+  })
+})
 
 describe('phases', () => {
   it('runs thirsty, resting, ready, then thirsty a stage higher', () => {

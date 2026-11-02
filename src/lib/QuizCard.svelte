@@ -1,10 +1,11 @@
 <script lang="ts">
   import { DECK_LABEL, DECK_PROMPT, SIDE_LABEL } from '../data/items'
   import { HINT_COST } from './garden'
-  import { CHEERS, type Quiz } from './quiz.svelte'
+  import { CHEERS, NEAR_MISS, type Quiz } from './quiz.svelte'
   import { app } from './store.svelte'
 
   const AUTO_NEXT_MS = 800
+  const MILESTONE_MS = 1500 // long enough to read a combo callout's gloss
 
   let {
     quiz,
@@ -22,11 +23,11 @@
   }
 
   // A right answer moves on by itself, unless there's something new to read: a kanji's readings
-  // only appear now, so that card waits (unless they were already bought).
+  // only appear now, so that card waits (unless they were already bought). So does a card just mastered.
   $effect(() => {
     const c = quiz.current
-    if (!auto || quiz.result !== 'right' || (c?.type === 'kanji' && !c.side && !quiz.revealed)) return
-    const t = setTimeout(onNext, AUTO_NEXT_MS)
+    if (!auto || quiz.result !== 'right' || quiz.justMastered || (c?.type === 'kanji' && !c.side && !quiz.revealed)) return
+    const t = setTimeout(onNext, quiz.praise.big ? MILESTONE_MS : AUTO_NEXT_MS)
     return () => clearTimeout(t)
   })
 
@@ -46,8 +47,11 @@
   {#key current.id}
     <div class="stage">
       {#key quiz.shake}
-        <div class="card" class:shake={quiz.result === 'wrong'} class:right={quiz.result === 'right'}>
-          <div class="tagline">{DECK_LABEL[current.type]} · {current.side ? SIDE_LABEL[current.side] : current.tag}</div>
+        <div class="card" class:shake={quiz.result === 'wrong' && !quiz.unsure} class:right={quiz.result === 'right'}>
+          <div class="tagline">
+            {DECK_LABEL[current.type]} · {current.side ? SIDE_LABEL[current.side] : current.tag}
+            {#if quiz.isNew}<span class="new-tag">New</span>{/if}
+          </div>
           <div class="big" class:mid={!reversed && current.front.length === 4} class:long={reversed || current.front.length > 4} lang={reversed ? 'en' : 'ja'}>{current.front}</div>
           {#if quiz.hintLocked}
             <div class="hint-buy">
@@ -83,6 +87,10 @@
             </div>
           {/if}
 
+          {#if !quiz.result}
+            <button class="linkish idk" onclick={() => quiz.dontKnow()}>I don't know</button>
+          {/if}
+
           {#if quiz.result === 'wrong'}
             <p class="explain">
               {#if current.type === 'grammar'}
@@ -114,12 +122,15 @@
     {#if quiz.result}
       <div class="row">
         {#if quiz.result === 'right'}
-          <div class="verdict right">
-            Correct!
+          <div class="verdict right" class:big={quiz.praise.big || quiz.justMastered}>
+            {#if quiz.justMastered}🌸 Mastered!{:else}{quiz.praise.en} {#if quiz.praise.ja}<span lang="ja">{quiz.praise.ja}</span>{/if}{/if}
             {#if quiz.gain}{#key quiz.gain.id}<b class="gain" aria-hidden="true">+{quiz.gain.amount} XP</b>{/key}{/if}
+            {#if quiz.praise.gloss && !quiz.justMastered}<small>({quiz.praise.gloss})</small>{/if}
           </div>
+        {:else if quiz.unsure}
+          <div class="verdict unsure">Now you know it.<small>It'll come back soon.</small></div>
         {:else}
-          {@const c = CHEERS[quiz.cheer]}
+          {@const c = quiz.near ? NEAR_MISS : CHEERS[quiz.cheer]}
           <div class="verdict wrong">{c.en} <span lang="ja">{c.ja}</span><small>({c.gloss})</small></div>
         {/if}
         <button class="primary" onclick={onNext}>{nextLabel}</button>

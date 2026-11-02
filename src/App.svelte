@@ -1,5 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte'
+  import Chapters from './lib/Chapters.svelte'
   import CoinFlights from './lib/CoinFlights.svelte'
   import Collection from './lib/Collection.svelte'
   import DevTools from './lib/DevTools.svelte'
@@ -12,8 +13,7 @@
   import Stats from './lib/Stats.svelte'
   import Tend from './lib/Tend.svelte'
   import Tour from './lib/Tour.svelte'
-  import { N5, type Lesson } from './data/build'
-  import { app, level, levelHold, quizState, setTour, toggleLesson, tourDid, type Preserved } from './lib/store.svelte'
+  import { app, chapterSheet, level, levelHold, quizState, setTour, tourDid, type Preserved } from './lib/store.svelte'
 
   type Tab = 'garden' | 'shop' | 'collection' | 'tend' | 'hiragana' | 'katakana' | 'kanji' | 'vocab' | 'grammar' | 'stats'
   // `hidden` leaves a screen out of the menu. The free practice decks are off for now.
@@ -63,10 +63,12 @@
     tab = 'collection'
     fresh = p
   }
-  const lessons: Lesson[] = [...Array.from({ length: 13 }, (_, i) => i), N5]
-  // The chips choose vocab and kanji chapters, so only the screens they affect show them, and not
-  // during a garden quiz, whose pool shouldn't change under it.
-  const chips = $derived(!quizState.open && tab !== 'collection' && tab !== 'shop' && tab !== 'tend' && tab !== 'hiragana' && tab !== 'katakana')
+
+  // A garden quiz's pool shouldn't change under it, so the menu leaves Chapters out while one is open.
+  const actions = $derived([
+    ...(quizState.open ? [] : [{ label: '📚 Chapters', run: () => (chapterSheet.open = true) }]),
+    { label: '🎓 Replay tutorial', run: () => (setTour('hello'), go('garden')) },
+  ])
 
   // Celebrate each new level. `seen` starts at the loaded level so opening the app doesn't count,
   // and follows a reset back down. A quiz in progress holds the popup back (levelHold); after that a
@@ -91,24 +93,13 @@
 <main>
   <header>
     <h1><button class="home" onclick={() => go('garden')}>My Japanese Garden</button></h1>
-    <Menu items={tabs.filter((t) => !t.hidden)} current={tab} onselect={go} actions={[{ label: '🎓 Replay tutorial', run: () => (setTour('hello'), go('garden')) }]} />
+    <Menu items={tabs.filter((t) => !t.hidden)} current={tab} onselect={go} {actions} />
   </header>
-
-  {#if chips}
-    <div class="chapters" role="group" aria-label="Chapters in your review pool">
-      <span class="lbl">Chapters</span>
-      {#each lessons as n (n)}
-        <button class="chip" class:on={app.lessons.includes(n)} class:n5={n === N5} aria-pressed={app.lessons.includes(n)} onclick={() => toggleLesson(n)}>
-          {n === N5 ? 'N5 Prep' : n === 0 ? 'Intro' : n}
-        </button>
-      {/each}
-    </div>
-  {/if}
 
   {#if tab === 'stats'}
     <Stats />
   {:else if tab === 'garden'}
-    <Garden onPreserved={preserved} onShop={shopFor} />
+    <Garden onPreserved={preserved} onShop={shopFor} onTend={() => go('tend')} />
   {:else if tab === 'shop'}
     <Shop {placeAt} onPlaced={() => (placeAt = null)} onGarden={() => go('garden')} />
   {:else if tab === 'collection'}
@@ -123,6 +114,7 @@
 <Tour screen={tab} onGarden={() => go('garden')} />
 <CoinFlights />
 <DevTools />
+{#if chapterSheet.open}<Chapters />{/if}
 {#if pressing}
   {@const p = pressing}
   <PressFlower species={p.species} variant={p.variant} onDone={() => showPressed(p)} />

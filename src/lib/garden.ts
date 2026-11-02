@@ -67,12 +67,19 @@ export const SPECIES = {
   poppy: { label: 'Poppy', deck: 'vocab' },
   lavender: { label: 'Lavender', deck: 'grammar' },
   hydrangea: { label: 'Hydrangea', deck: 'grammar' },
+  starter: { label: 'Starter blossom', deck: 'hiragana' },
 } as const satisfies Record<string, SpeciesInfo>
 
 export type Species = keyof typeof SPECIES
 
-export const speciesFor = (deck: Deck): Species[] =>
-  (Object.keys(SPECIES) as Species[]).filter((s) => SPECIES[s].deck === deck)
+// The tutorial's own plant. It's never offered for planting or kept in the collection, and it leaves
+// the garden when the tutorial has finished with it.
+export const STARTER: Species = 'starter'
+
+// Everything a player can plant and collect.
+export const GROWABLE = (Object.keys(SPECIES) as Species[]).filter((s) => s !== STARTER)
+
+export const speciesFor = (deck: Deck): Species[] => GROWABLE.filter((s) => SPECIES[s].deck === deck)
 
 export interface Plot {
   species: Species
@@ -113,6 +120,12 @@ export function formatWait(ms: number): string {
 export function plantSeed(species: Species, variant = 0): Plot {
   return { species, deck: SPECIES[species].deck, stage: SEEDED, doneAt: null, waters: 0, grooms: 0, variant }
 }
+
+// One growth from blooming, so the tutorial can show the whole cycle in a single sitting.
+export const plantStarter = (): Plot => ({ ...plantSeed(STARTER), stage: BLOOMED - 1 })
+
+// Its rest is over as soon as it's watered.
+export const waterStarter = (plot: Plot, now: number): Plot => ({ ...plot, doneAt: now - COOLDOWN_MS, waters: plot.waters + 1 })
 
 export const completionBonus = (plot: Plot): number => (plot.stage === BLOOMED ? GROOM_BONUS_XP : WATER_BONUS_XP)
 

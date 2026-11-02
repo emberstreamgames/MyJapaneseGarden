@@ -1,8 +1,9 @@
 <script lang="ts">
   import { BLOOMED, PLOT_COUNT, SPECIES, STAGE_NAMES } from './garden'
   import {
-    app, debugAddCoins, debugAntCoin, debugFill, debugPreservable, debugReady, debugSetStage, debugSkipTime, debugSproutWeed, debugStreakDay, debugVisitor,
+    app, debugAddCoins, debugAntCoin, debugFill, debugPreservable, debugReady, debugSetStage, debugSkipTime, debugSproutWeed, debugStreakDay, debugVisitor, seasonPreview,
   } from './store.svelte'
+  import { FESTIVALS, SEASONS } from './seasons'
 
   // The developer panel: a 🛠 button on every screen once debug tools are unlocked from Stats.
   let open = $state(false)
@@ -70,6 +71,31 @@
           <button disabled={!plot} onclick={() => debugPreservable(plotNo - 1)}>Make preservable</button>
         </div>
         <p class="dim">Set stage leaves the plant thirsty. Skip timer makes it ready to grow, with or without a watering.</p>
+
+        <h3>Season preview</h3>
+        <div class="settings">
+          <label>Season
+            <select bind:value={seasonPreview.season}>
+              <option value="">Today's</option>
+              {#each Object.keys(SEASONS) as s}<option value={s}>{s}</option>{/each}
+            </select>
+          </label>
+          <label>Time
+            <select bind:value={seasonPreview.hours}>
+              <option value="">Now</option>
+              <option value="day">day</option>
+              <option value="dusk">dusk</option>
+              <option value="night">night</option>
+            </select>
+          </label>
+          <label>Festival
+            <select bind:value={seasonPreview.festival}>
+              <option value="">Today's</option>
+              <option value="none">none</option>
+              {#each Object.keys(FESTIVALS) as f}<option value={f}>{f}</option>{/each}
+            </select>
+          </label>
+        </div>
 
         <h3>Garden</h3>
         <div class="settings">

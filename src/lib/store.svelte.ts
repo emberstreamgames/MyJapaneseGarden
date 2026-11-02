@@ -2,10 +2,10 @@ import { untrack } from 'svelte'
 import type { Lesson } from '../data/build'
 import { EXTRA_CARDS, ITEMS, deckReady, type Deck, type Item } from '../data/items'
 import {
-  ANT_COINS, BLOOMED, COMPLETE_COINS, COOLDOWN_MS, GROW_COINS, HINT_COST, PERFECT_COINS, PLOT_COUNT, PRESERVE_COINS, PRESERVE_GROOMS, QUIZ_LENGTH,
-  QUIZ_VISITORS, SEEDED, SKIP_COST, SPECIES, TEND_LENGTH, TEND_PER_DAY, WEED_BONUS_XP, WEED_COINS, WEED_EVERY_MS,
-  advance, antCoinDue, canPreserve, completeQuiz, completionBonus, normalizeGarden, normalizeWeeds, plantSeed, shrinkGarden, skipRest, sproutWeeds,
-  VISITOR_COINS, visitorDue, type Plot, type Species, type Weed,
+  ANT_COINS, BLOOMED, COMPLETE_COINS, COOLDOWN_MS, GROW_COINS, GROWABLE, HINT_COST, PERFECT_COINS, PLOT_COUNT, PRESERVE_COINS, PRESERVE_GROOMS, QUIZ_LENGTH,
+  QUIZ_VISITORS, SEEDED, SKIP_COST, SPECIES, STARTER, TEND_LENGTH, TEND_PER_DAY, WEED_BONUS_XP, WEED_COINS, WEED_EVERY_MS,
+  advance, antCoinDue, canPreserve, completeQuiz, completionBonus, normalizeGarden, normalizeWeeds, plantSeed, plantStarter, shrinkGarden, skipRest, sproutWeeds,
+  VISITOR_COINS, visitorDue, waterStarter, type Plot, type Species, type Weed,
 } from './garden'
 import { rollVariant } from './blooms'
 import { discover, flowerKey, normalizeCollection, press, type Collection } from './collection'
@@ -15,7 +15,8 @@ import { LOOK_BY_ID, newLook, normalizeLook, type LookState } from './look'
 import { DECOR_SPOTS, WEED_SPOTS } from './meadow'
 import { dayNumber, newStreak, normalizeStreak, studyOn, type Streak, type StudyResult } from './streak'
 import { NEW_PER_DAY, isKnown, isMastered, mostOverdue, normalizeSrs, review, seedSrs, weakest, type Srs } from './srs'
-import { nextStep, normalizeTour, type TourStep } from './tour'
+import { hasStarter, nextStep, normalizeTour, type TourStep } from './tour'
+import type { FestivalId, Hours, Season } from './seasons'
 
 export type Mode = 'mix' | 'choice' | 'type'
 
@@ -133,7 +134,7 @@ function repair(data: Saved): Saved {
   data.streak = normalizeStreak(data.streak)
   // Saves from before the collection already have flowers in bloom: count them as discovered.
   let found = normalizeCollection(data.collection)
-  for (const p of data.garden) if (p?.stage === BLOOMED) found = discover(found, p.species, p.variant, Date.now())
+  for (const p of data.garden) if (p?.stage === BLOOMED && p.species !== STARTER) found = discover(found, p.species, p.variant, Date.now())
   // A bloom that no longer fits is pressed into the collection; a younger plant pays back its growth coins.
   for (const p of shrunk.extra) {
     if (p.stage === BLOOMED) found = press(found, p.species, p.variant, Date.now())
@@ -149,6 +150,7 @@ function repair(data: Saved): Saved {
   data.seedsUsed = count(data.seedsUsed)
   // Players from before the tutorial already know their way around.
   data.tour = data.version < 6 ? null : normalizeTour(data.tour)
+  if (!hasStarter(data.tour)) data.garden = data.garden.map((p) => (p?.species === STARTER ? null : p))
   data.version = SAVE_VERSION
   return data
 }
@@ -210,9 +212,11 @@ const countToday = (key: 'newCards' | 'tends' | 'visitors', now: number) => (app
 
 export const newLeft = (now = Date.now()) => NEW_PER_DAY - countToday('newCards', now)
 
-export function record(id: string, correct: boolean, now = Date.now()) {
+// `mastered` and `known` are true when this answer carried the card over that line.
+export function record(id: string, correct: boolean, now = Date.now()): { mastered: boolean; known: boolean } {
   if (!app.stats[id]) today(now).newCards++
   const s = (app.stats[id] ??= { c: 0, w: 0, streak: 0, last: 0 })
+  const before = { mastered: isMastered(s), known: isKnown(s) }
   if (correct) {
     s.c++
     s.streak++
@@ -223,6 +227,7 @@ export function record(id: string, correct: boolean, now = Date.now()) {
   s.srs = review(s.srs, s.last, correct, now)
   s.last = now
   save()
+  return { mastered: !before.mastered && isMastered(s), known: !before.known && isKnown(s) }
 }
 
 // Words the player has held on to for a while, counting a word in two lists once.
@@ -238,6 +243,12 @@ export function startTend(now = Date.now()): boolean {
   save()
   return true
 }
+
+// The chapter picker, opened from the garden, Stats, the menu and any "nothing to study" message.
+export const chapterSheet = $state({ open: false })
+
+// Dev tools: try a season without waiting for it. Not saved.
+export const seasonPreview = $state<{ season: Season | ''; hours: Hours | ''; festival: FestivalId | 'none' | '' }>({ season: '', hours: '', festival: '' })
 
 // Whether a garden quiz is on screen.
 export const quizState = $state({ open: false })
@@ -338,7 +349,7 @@ export function growPlot(i: number, now = Date.now()): { found: boolean } | null
   app.garden[i] = next
   app.coins += GROW_COINS
   let found = false
-  if (next.stage === BLOOMED) {
+  if (next.stage === BLOOMED && next.species !== STARTER) {
     found = !app.collection[flowerKey(next.species, next.variant)]
     app.collection = discover(app.collection, next.species, next.variant, now)
   }
@@ -393,7 +404,7 @@ export function tendWeeds(now = Date.now()) {
   save()
 }
 
-// Call once a weed's question is answered.
+// Call once for each weed whose question was answered.
 export function pullWeed(spot: number): boolean {
   const i = app.weeds.findIndex((w) => w.spot === spot)
   if (i < 0) return false
@@ -538,14 +549,51 @@ export function tourDid(step: TourStep) {
   save()
 }
 
+const clearStarter = () => {
+  const i = app.garden.findIndex((p) => p?.species === STARTER)
+  if (i >= 0) app.garden[i] = null
+}
+
 export function setTour(step: TourStep | null) {
   app.tour = step
+  if (!hasStarter(step)) clearStarter()
   save()
 }
 
+// The first question's own XP: what a first right answer pays in a quiz.
+const STARTER_XP = 12
+
+// The guided question is answered: the plant is watered and ready to grow straight away.
+export function waterStarterPlot(i: number, now = Date.now()) {
+  const plot = validSlot(i) ? app.garden[i] : null
+  if (plot?.species !== STARTER) return
+  app.garden[i] = waterStarter(plot, now)
+  app.xp += STARTER_XP
+  tourDid('starter-water')
+  save()
+}
+
+// Groomed, it leaves a seed behind and frees its plot for the player's first real plant.
+export function retireStarter() {
+  clearStarter()
+  tourDid('starter-groom')
+  save()
+}
+
+// The middle of the third row, the plot the 'plant' step points at next.
+const STARTER_PLOT = 6
+
 // Make sure what the current step asks for is there: a visitor or ant coin due, a weed, an empty plot.
 export function prepTour(now = Date.now()) {
-  if (app.tour === 'visitor' && !visitorDue(app.visitorAt, now)) app.visitorAt = 0
+  const starter = app.garden.findIndex((p) => p?.species === STARTER)
+  if (app.tour === 'hello' || app.tour === 'starter-water') {
+    const i = starter >= 0 ? starter : app.garden[STARTER_PLOT] ? app.garden.indexOf(null) : STARTER_PLOT
+    // A replay with every plot full skips the starter.
+    if (i < 0) return app.tour === 'starter-water' ? tourDid('starter-water') : undefined
+    if (starter < 0 || app.garden[i]?.stage === BLOOMED || app.garden[i]?.doneAt !== null) app.garden[i] = plantStarter()
+  } else if (app.tour === 'starter-grow' && (starter < 0 || app.garden[starter]?.stage === BLOOMED)) return tourDid('starter-grow')
+  else if (app.tour === 'starter-groom' && starter < 0) return tourDid('starter-groom')
+  else if (app.tour === 'visitor' && !visitorDue(app.visitorAt, now)) app.visitorAt = 0
   else if (app.tour === 'ant' && !antCoinDue(app.antCoinAt, now)) app.antCoinAt = 0
   else if (app.tour === 'weed' && !app.weeds.length) {
     app.weedAt = Math.min(app.weedAt, now) - WEED_EVERY_MS
@@ -623,7 +671,7 @@ export function debugSetStage(i: number, stage: number) {
 
 // Plant every empty plot with a random plantable species at a random stage.
 export function debugFill() {
-  const species = (Object.keys(SPECIES) as Species[]).filter((s) => deckReady(SPECIES[s].deck))
+  const species = GROWABLE.filter((s) => deckReady(SPECIES[s].deck))
   if (!species.length) return
   app.garden = app.garden.map((p) => {
     if (p) return p

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { DECK_LABEL, ITEMS, type Deck } from '../data/items'
-  import { app, holdLevelUps, level, levelProgress } from './store.svelte'
+  import { app, chapterSheet, holdLevelUps, level, levelProgress } from './store.svelte'
   import { Quiz } from './quiz.svelte'
   import QuizCard from './QuizCard.svelte'
 
@@ -32,11 +32,12 @@
       <h2>No {DECK_LABEL[deck]} in your pool</h2>
       <p>
         {#if ITEMS.some((i) => i.type === deck)}
-          Turn on a chapter above to add its {DECK_LABEL[deck]} to your pool.
+          Add a chapter to study its {DECK_LABEL[deck]}.
         {:else}
           {DECK_LABEL[deck]} content isn't loaded yet. It's coming once the textbook pages are added.
         {/if}
       </p>
+      {#if ITEMS.some((i) => i.type === deck)}<button class="primary" onclick={() => (chapterSheet.open = true)}>Choose chapters</button>{/if}
     </div>
   {:else}
     <QuizCard {quiz} onNext={() => quiz.next()} />

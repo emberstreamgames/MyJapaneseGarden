@@ -7,7 +7,7 @@
   import { BLOOMS, bloomName } from './blooms'
   import { flowerName } from './collection'
   import * as sfx from './sfx'
-  import { app, plantAt, poolFor, preservePlant, removePlant, seedPackets, skipWait, tourDid, type Preserved } from './store.svelte'
+  import { app, chapterSheet, plantAt, poolFor, preservePlant, removePlant, seedPackets, skipWait, tourDid, type Preserved } from './store.svelte'
 
   let {
     index,
@@ -127,7 +127,10 @@
         <button class="primary big-btn" disabled={emptyPool} onclick={() => onStart(index)}>
           {bloomed ? '✂️ Groom' : '💧 Water'} · 10 questions
         </button>
-        {#if emptyPool}<p class="dim">No {DECK_LABEL[plot.deck]} in your pool. Turn on a chapter above.</p>{/if}
+        {#if emptyPool}
+          <p class="dim">None of your chapters have {DECK_LABEL[plot.deck]} yet.</p>
+          <button class="big-btn" onclick={() => (chapterSheet.open = true)}>Choose chapters</button>
+        {/if}
       {:else if phase === 'resting'}
         <p class="note">{bloomed ? 'Groomed' : 'Watered'}. {bloomed ? 'Ready to groom again' : 'Ready to grow'} in {formatWait(msUntilReady(plot, now))}.</p>
         <button class="big-btn" disabled={app.coins < SKIP_COST} onclick={skip}>🪙 {SKIP_COST} · Skip the wait</button>

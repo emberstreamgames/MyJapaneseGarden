@@ -4,16 +4,23 @@
   import { flyCoins, inFlight } from './coinfly.svelte'
   import Decor from './Decor.svelte'
   import { DECOR, available } from './decor'
+  import Festival from './Festival.svelte'
   import { DECK_LABEL, type Deck } from '../data/items'
+  import { lessonTag } from '../data/build'
   import GardenQuiz from './GardenQuiz.svelte'
+  import GroomSnip from './GroomSnip.svelte'
   import GrowBeam from './GrowBeam.svelte'
-  import { BLOOMED, WEED_BONUS_XP, WEED_COINS, WELCOME_AFTER_MS, completionBonus, formatWait, msUntilReady, phaseOf, type Species, type Weed } from './garden'
+  import HudSheet from './HudSheet.svelte'
+  import { BLOOMED, STARTER, WEED_BONUS_XP, WEED_COINS, WELCOME_AFTER_MS, completionBonus, formatWait, msUntilReady, phaseOf, type Species, type Weed } from './garden'
   import { WEED_SPOTS, scene, weedBox } from './meadow'
   import PlotSheet from './PlotSheet.svelte'
   import PlotTile from './PlotTile.svelte'
+  import SeasonLayer from './SeasonLayer.svelte'
+  import { FESTIVALS, SEASONS, ambientSky, festivalOn, hoursOf, seasonOf, type FestivalId } from './seasons'
   import * as sfx from './sfx'
   import Sky from './Sky.svelte'
-  import { antCoinReady, app, finishQuiz, growPlot, knownWords, level, levelProgress, markSeen, poolFor, pullWeed, setTour, tendWeeds, tourDid, type Preserved } from './store.svelte'
+  import StarterQuiz from './StarterQuiz.svelte'
+  import { antCoinReady, app, chapterSheet, finishQuiz, growPlot, knownWords, level, levelProgress, markSeen, poolFor, pullWeed, retireStarter, seasonPreview, setTour, tendWeeds, tendsLeft, tourDid, waterStarterPlot, weakItems, type Preserved } from './store.svelte'
   import { dayNumber, liveStreak, rainedDays } from './streak'
   import Visitors from './Visitors.svelte'
   import Welcome, { type Away } from './Welcome.svelte'
@@ -21,20 +28,24 @@
   import WeedPluck from './WeedPluck.svelte'
   import WeedSprite from './WeedSprite.svelte'
 
-  let { onPreserved, onShop }: { onPreserved: (p: Preserved) => void; onShop: (spot: number | null) => void } = $props()
+  let { onPreserved, onShop, onTend }: { onPreserved: (p: Preserved) => void; onShop: (spot: number | null) => void; onTend: () => void } = $props()
 
   const DECKS: Deck[] = ['hiragana', 'katakana', 'kanji', 'vocab', 'grammar']
 
   let now = $state(Date.now())
   let selected = $state<number | null>(null)
-  // `target` is the plot index, or the weed's spot for a weed quiz.
-  let quiz = $state<{ target: number; deck: Deck; mode: 'water' | 'groom' | 'weed'; bonus: number } | null>(null)
+  // `target` is the plot index; `spots` are the weeds' spots for a weed quiz.
+  let quiz = $state<{ target: number; deck: Deck; mode: 'water' | 'groom' | 'weed'; bonus: number; spots: number[] } | null>(null)
+  let guide = $state<number | null>(null) // the starter plant whose guided question is on screen
   let watered: number | null = null // plot whose watering quiz finished, splashed on return
   let splash = $state<number | null>(null)
-  let pulled: Weed | null = null // weed whose question was answered, plucked on return
-  let pluck = $state<Weed | null>(null)
+  let pulled: Weed[] = [] // weeds whose questions were answered, plucked on return
+  let pluck = $state<Weed[]>([])
+  let groomed: number | null = null // plot whose grooming quiz finished, snipped on return
+  let snip = $state<{ index: number; last: boolean } | null>(null)
+  let hud = $state<'level' | 'streak' | 'coins' | null>(null)
   let away = $state<Away | null>(null)
-  let weedAsk = $state<{ w: Weed; deck: Deck } | null>(null) // the pre-screen before a weed's question
+  let weedAsk = $state<{ w: Weed; deck: Deck; count: number } | null>(null) // the pre-screen before a weed's question
   let earned = 0 // perfect and streak coins from the quiz just finished, flown in on return
   let growing = $state<{ index: number; species: Species; stage: number; free: boolean }[]>([]) // plots under a sunbeam; free once it has passed
 
@@ -60,9 +71,8 @@
     }
   })
 
-  const attention = $derived(
-    app.garden.filter((p) => p && (phaseOf(p, now) === 'thirsty' || phaseOf(p, now) === 'ready')).length,
-  )
+  const ready = $derived(app.garden.filter((p) => p && phaseOf(p, now) === 'ready').length)
+  const thirsty = $derived(app.garden.filter((p) => p && phaseOf(p, now) === 'thirsty').length)
   const nextWait = $derived.by(() => {
     const waits = app.garden.flatMap((p) => (p && phaseOf(p, now) === 'resting' ? [msUntilReady(p, now)] : []))
     return waits.length ? Math.min(...waits) : null
@@ -73,6 +83,19 @@
   const today = $derived(dayNumber(now))
   const streak = $derived(liveStreak(app.streak, today))
   const studiedToday = $derived(app.streak.day === today)
+  const chapterLabel = $derived(
+    app.lessons.length ? [...app.lessons].sort((a, b) => (a === 'n5' ? 1 : b === 'n5' ? -1 : +a - +b)).map(lessonTag).join(', ').replaceAll('Lesson ', '') : 'None chosen',
+  )
+  // Worth pointing at only once today's study is done, and never during the tutorial.
+  const weak = $derived(!app.tour && studiedToday && tendsLeft() ? weakItems().length : 0)
+
+  const FESTIVAL_ICON: Record<FestivalId, string> = { shogatsu: '🎍', hanami: '🏮', tanabata: '🎋', tsukimi: '🌕' }
+  const SEASON_ICON = { spring: '🌸', summer: '☀️', autumn: '🍁', winter: '❄️' }
+  const date = $derived(new Date(now))
+  const season = $derived(seasonPreview.season || seasonOf(date.getMonth() + 1))
+  const hours = $derived(seasonPreview.hours || hoursOf(date.getHours()))
+  const festival = $derived(seasonPreview.festival === 'none' ? null : seasonPreview.festival || festivalOn(date.getMonth() + 1, date.getDate()))
+  const worn = $derived(app.look.wearing.sky)
 
   function summarize(sprouted: number): Away {
     const phases = app.garden.flatMap((p) => (p ? [phaseOf(p, now)] : []))
@@ -91,9 +114,14 @@
 
   function open(i: number) {
     now = Date.now()
-    if (beamed(i)) return
+    if (beamed(i) || snip?.index === i) return
     const p = app.garden[i]
     if (p && phaseOf(p, now) === 'ready') return beginGrow(i)
+    if (p?.species === STARTER) {
+      if (p.stage === BLOOMED) snip = { index: i, last: true }
+      else guide = i
+      return
+    }
     selected = i
     if (p && phaseOf(p, now) === 'thirsty') tourDid('water')
   }
@@ -132,24 +160,27 @@
     selected = null
     growing = [] // the quiz replaces the bed; a beam cut short leaves its plant ready
     watered = null
+    groomed = null
     tourDid('quiz')
-    quiz = { target: i, deck: p.deck, mode: p.stage === BLOOMED ? 'groom' : 'water', bonus: completionBonus(p) }
+    quiz = { target: i, deck: p.deck, mode: p.stage === BLOOMED ? 'groom' : 'water', bonus: completionBonus(p), spots: [] }
   }
 
   // A weed asks one question from any deck the enabled chapters cover. The deck is picked first so
   // the pre-screen can say what kind of question is coming. The tutorial's weed asks hiragana, the gentlest.
   function askWeed(w: Weed) {
     const decks = app.tour && poolFor('hiragana').length ? ['hiragana' as const] : DECKS.filter((d) => poolFor(d).length)
-    weedAsk = { w, deck: decks[Math.floor(Math.random() * decks.length)] ?? 'hiragana' }
+    weedAsk = { w, deck: decks[Math.floor(Math.random() * decks.length)] ?? 'hiragana', count: app.tour ? 1 : app.weeds.length }
   }
 
-  function startWeed() {
+  // `all` pulls every weed on the lawn in one run, starting with the one tapped.
+  function startWeed(all: boolean) {
     if (!weedAsk) return
     const { w, deck } = weedAsk
     weedAsk = null
     growing = []
-    pulled = null
-    quiz = { target: w.spot, deck, mode: 'weed', bonus: WEED_BONUS_XP }
+    pulled = []
+    const others = all ? app.weeds.filter((o) => o.spot !== w.spot).map((o) => o.spot) : []
+    quiz = { target: w.spot, deck, mode: 'weed', bonus: WEED_BONUS_XP, spots: [w.spot, ...others] }
   }
 
   function closeQuiz() {
@@ -158,8 +189,10 @@
     now = Date.now()
     splash = watered
     pluck = pulled
+    if (groomed !== null) snip = { index: groomed, last: false }
     watered = null
-    pulled = null
+    pulled = []
+    groomed = null
     const coins = earned
     earned = 0
     // The garden (and its coin counter) mounts on the next tick.
@@ -168,14 +201,31 @@
 
   function complete(target: number, mode: 'water' | 'groom' | 'weed', right: number) {
     if (mode === 'weed') {
-      const w = app.weeds.find((w) => w.spot === target)
-      if (w && pullWeed(target)) pulled = { ...w }
+      for (const spot of quiz?.spots.slice(0, right) ?? []) {
+        const w = app.weeds.find((w) => w.spot === spot)
+        if (w && pullWeed(spot)) pulled.push({ ...w })
+      }
       return null
     }
     const reward = finishQuiz(target, right)
     if (reward && mode === 'water') watered = target
+    if (reward && mode === 'groom') groomed = target
     earned = reward?.coins ?? 0
     return reward
+  }
+
+  function starterWatered() {
+    const i = guide
+    guide = null
+    if (i === null) return
+    waterStarterPlot(i)
+    splash = i
+  }
+
+  function snipped() {
+    const done = snip
+    snip = null
+    if (done?.last) retireStarter()
   }
 
   function onKey(e: KeyboardEvent) {
@@ -190,26 +240,31 @@
 
 <svelte:window onkeydown={onKey} />
 
-{#if quiz}
+{#if guide !== null}
+  <StarterQuiz onDone={starterWatered} />
+{:else if quiz}
   {@const q = quiz}
-  <GardenQuiz deck={q.deck} mode={q.mode} plot={q.mode === 'weed' ? null : app.garden[q.target]} bonus={q.bonus} onComplete={(right) => complete(q.target, q.mode, right)} onClose={closeQuiz} />
+  <GardenQuiz deck={q.deck} mode={q.mode} plot={q.mode === 'weed' ? null : app.garden[q.target]} bonus={q.bonus} weeds={q.spots.length || 1} onComplete={(right) => complete(q.target, q.mode, right)} onClose={closeQuiz} {onTend} />
 {:else}
   <section class="garden">
     <div class="hud">
-      <div class="lvl">Lv {level()}</div>
-      <div class="xpbar" aria-label="XP progress"><div style="width:{pct}%"></div></div>
+      <button class="hud-btn hud-level" aria-label="Level {level()}, see your progress" onclick={() => (hud = 'level')}>
+        <span class="lvl">Lv {level()}</span>
+        <span class="xpbar"><span class="xpfill" style="width:{pct}%"></span></span>
+      </button>
       {#if streak}
-        <div class="streak" class:pending={!studiedToday} title={studiedToday ? `${streak}-day streak` : 'Water or groom a plant today to grow your streak'} aria-label="{streak}-day streak">🌱 {streak}</div>
+        <button class="hud-btn streak" class:pending={!studiedToday} aria-label="{streak}-day streak, see details" onclick={() => (hud = 'streak')}>🌱 {streak}</button>
       {/if}
-      <div class="coins" data-coin-target aria-label="{app.coins} coins">🪙 {app.coins - inFlight.coins}</div>
+      <button class="hud-btn" aria-label="{app.coins} coins, see how to earn more" onclick={() => (hud = 'coins')}><span class="coins" data-coin-target>🪙 {app.coins - inFlight.coins}</span></button>
     </div>
 
     <div class="bed">
       {@html scene(app.look.wearing)}
+      {#if festival && festival !== 'tsukimi'}<Festival {festival} />{/if}
       <Decor {onShop} />
       <div class="plots">
         {#each app.garden as plot, i (i)}
-          <PlotTile {plot} index={i} {now} growing={beamed(i)} onclick={() => open(i)} />
+          <PlotTile {plot} index={i} {now} growing={beamed(i)} leaving={snip?.last && snip.index === i} onclick={() => open(i)} />
         {/each}
       </div>
       {#each app.weeds as w (w.spot)}
@@ -219,11 +274,12 @@
       {/each}
       <Ants />
       <Visitors />
-      <Sky sky={app.look.wearing.sky} />
-      {#if pluck}
-        {@const p = pluck}
-        <WeedPluck spot={p.spot} kind={p.kind} onPop={() => !app.muted && sfx.pluck()} onDone={() => (pluck = null)} />
-      {/if}
+      <Sky sky={worn} />
+      <SeasonLayer {hours} {festival} ambient={worn === 'clear' ? ambientSky(season, hours) : 'clear'} />
+      <!-- A run of weeds comes out together, so only the first one makes a sound. -->
+      {#each pluck as p, i (p.spot)}
+        <WeedPluck spot={p.spot} kind={p.kind} onPop={() => i === 0 && !app.muted && sfx.pluck()} onDone={() => (pluck = pluck.filter((o) => o !== p))} />
+      {/each}
       {#if splash !== null}
         <WaterSplash index={splash} onLand={() => !app.muted && sfx.splash()} onDone={() => (splash = null)} />
       {/if}
@@ -234,19 +290,28 @@
           stage={g.stage}
           onStart={() => !app.muted && sfx.charge(1.4)}
           onGrow={() => grow(g.index)}
-          onFree={() => (g.free = true)}
+          onFree={() => {
+            g.free = true
+            tourDid('starter-grow')
+          }}
           onDone={() => (growing = growing.filter((o) => o.index !== g.index))}
         />
       {/each}
+      {#if snip}
+        {@const s = snip}
+        <GroomSnip index={s.index} stage={BLOOMED} last={s.last} onSnip={() => !app.muted && sfx.snip()} onDone={snipped} />
+      {/if}
     </div>
 
     <p class="gstatus">
       {#if !planted}
         Tap a plot to plant your first seed.
-      {:else if attention && studiedToday}
-        One plant is enough today. The {attention === 1 ? 'other one' : `other ${attention}`} can wait if you'd like a rest.
-      {:else if attention}
-        {attention === 1 ? 'A plant would' : `${attention} plants would`} love some care. Just one is enough for today.
+      {:else if ready}
+        {ready === 1 ? 'A plant is' : `${ready} plants are`} ready to grow. Tap the ✨.
+      {:else if thirsty && studiedToday}
+        One plant is enough today. The {thirsty === 1 ? 'other one' : `other ${thirsty}`} can wait if you'd like a rest.
+      {:else if thirsty}
+        {thirsty === 1 ? 'A plant would' : `${thirsty} plants would`} love some care. Just one is enough for today.
       {:else if app.weeds.length}
         {app.weeds.length === 1 ? 'A weed is' : `${app.weeds.length} weeds are`} creeping in. Tap to pull for coins.
       {:else if unplaced}
@@ -256,6 +321,16 @@
       {/if}
     </p>
     {#if words}<p class="gread">📖 You can read {words} {words === 1 ? 'word' : 'words'}</p>{/if}
+    {#if weak}<button class="gtend" onclick={onTend}>🌿 {weak === 1 ? '1 shaky word' : `${weak} shaky words`} could use a quick tend</button>{/if}
+    <p class="gseason">
+      {#if festival}
+        {@const f = FESTIVALS[festival]}
+        {FESTIVAL_ICON[festival]} <span lang="ja">{f.ja}</span> ({f.reading}: “{f.gloss}”). {f.line}
+      {:else}
+        {SEASON_ICON[season]} <span lang="ja">{SEASONS[season].ja}</span> ({SEASONS[season].reading}: “{SEASONS[season].gloss}”)
+      {/if}
+    </p>
+    <button class="gchapters" onclick={() => (chapterSheet.open = true)}>📚 Chapters: {chapterLabel}</button>
   </section>
 
   {#if selected !== null}
@@ -271,9 +346,15 @@
         <h2>Pull the weeds!</h2>
         <p>Answer a <b>{DECK_LABEL[a.deck]}</b> question to earn coins!</p>
         <p class="coins">+{WEED_COINS} 🪙 · +{WEED_BONUS_XP} XP</p>
-        <button class="primary big-btn" onclick={startWeed}>Start</button>
+        <button class="primary big-btn" onclick={() => startWeed(false)}>Start</button>
+        {#if a.count > 1}
+          <button class="big-btn" onclick={() => startWeed(true)}>🌿 Pull all {a.count} · {a.count} questions · +{a.count * WEED_COINS} 🪙</button>
+        {/if}
       </div>
     </div>
+  {/if}
+  {#if hud}
+    <HudSheet kind={hud} {streak} studied={studiedToday} onClose={() => (hud = null)} onShop={() => { hud = null; onShop(null) }} />
   {/if}
   {#if away}
     <Welcome {away} onClose={() => (away = null)} />
