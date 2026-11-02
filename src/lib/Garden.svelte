@@ -13,7 +13,7 @@
   import PlotTile from './PlotTile.svelte'
   import * as sfx from './sfx'
   import Sky from './Sky.svelte'
-  import { antCoinReady, app, finishQuiz, growPlot, level, levelProgress, markSeen, poolFor, pullWeed, setTour, tendWeeds, tourDid, type Preserved } from './store.svelte'
+  import { antCoinReady, app, finishQuiz, growPlot, knownWords, level, levelProgress, markSeen, poolFor, pullWeed, setTour, tendWeeds, tourDid, type Preserved } from './store.svelte'
   import { dayNumber, liveStreak, rainedDays } from './streak'
   import Visitors from './Visitors.svelte'
   import Welcome, { type Away } from './Welcome.svelte'
@@ -68,6 +68,7 @@
     return waits.length ? Math.min(...waits) : null
   })
   const planted = $derived(app.garden.filter((p) => p).length)
+  const words = $derived(knownWords())
   const unplaced = $derived(DECOR.some((d) => available(app.decor, d.id) > 0) && app.decor.placed.slice(0, app.decor.open).some((p) => !p))
   const today = $derived(dayNumber(now))
   const streak = $derived(liveStreak(app.streak, today))
@@ -242,8 +243,10 @@
     <p class="gstatus">
       {#if !planted}
         Tap a plot to plant your first seed.
+      {:else if attention && studiedToday}
+        One plant is enough today. The {attention === 1 ? 'other one' : `other ${attention}`} can wait if you'd like a rest.
       {:else if attention}
-        {attention} {attention === 1 ? 'plant needs' : 'plants need'} you.
+        {attention === 1 ? 'A plant would' : `${attention} plants would`} love some care. Just one is enough for today.
       {:else if app.weeds.length}
         {app.weeds.length === 1 ? 'A weed is' : `${app.weeds.length} weeds are`} creeping in. Tap to pull for coins.
       {:else if unplaced}
@@ -252,6 +255,7 @@
         All resting. Next ready in {formatWait(nextWait)}.
       {/if}
     </p>
+    {#if words}<p class="gread">📖 You can read {words} {words === 1 ? 'word' : 'words'}</p>{/if}
   </section>
 
   {#if selected !== null}

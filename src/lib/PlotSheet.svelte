@@ -4,9 +4,10 @@
   import ConfirmSheet from './ConfirmSheet.svelte'
   import FlowerHead from './FlowerHead.svelte'
   import PlantSprite from './PlantSprite.svelte'
-  import { bloomName } from './blooms'
+  import { BLOOMS, bloomName } from './blooms'
+  import { flowerName } from './collection'
   import * as sfx from './sfx'
-  import { app, plantAt, poolFor, preservePlant, removePlant, skipWait, tourDid, type Preserved } from './store.svelte'
+  import { app, plantAt, poolFor, preservePlant, removePlant, seedPackets, skipWait, tourDid, type Preserved } from './store.svelte'
 
   let {
     index,
@@ -33,8 +34,17 @@
   const bloomed = $derived(plot?.stage === BLOOMED)
   const emptyPool = $derived(plot ? poolFor(plot.deck).length === 0 : false)
 
-  function plant(s: Species) {
-    if (!plantAt(index, s) || app.tour !== 'plant') return
+  let choosing = $state<Species | null>(null) // species picked, with a seed packet to spend on its bloom
+
+  // With a seed packet in hand, the player can pick the bloom first.
+  function pick(s: Species) {
+    if (seedPackets() > 0 && !app.tour) choosing = s
+    else plant(s)
+  }
+
+  function plant(s: Species, variant?: number) {
+    choosing = null
+    if (!plantAt(index, s, variant) || app.tour !== 'plant') return
     // The tutorial visits the shop before the first watering, so it doesn't offer the quiz yet.
     tourDid('plant')
     onClose()
@@ -74,7 +84,20 @@
   <div class="sheet" role="dialog" aria-modal="true" aria-label={plot ? SPECIES[plot.species].label : 'Choose a plant'}>
     <button class="x" aria-label="Close" onclick={onClose}>✕</button>
 
-    {#if !plot}
+    {#if !plot && choosing}
+      {@const s = choosing}
+      <h2>Choose a bloom</h2>
+      <p class="dim">Spend a seed packet on a {SPECIES[s].label.toLowerCase()} colour ({seedPackets()} left), or keep it for later.</p>
+      <div class="bloom-picks">
+        {#each Array(BLOOMS[s].length + 1) as _, v (v)}
+          <button class="bloom-pick" onclick={() => plant(s, v)}>
+            <FlowerHead species={s} variant={v} />
+            <span>{flowerName(s, v)}</span>
+          </button>
+        {/each}
+      </div>
+      <button class="big-btn" onclick={() => plant(s)}>🎲 Surprise me</button>
+    {:else if !plot}
       <h2>Choose a plant</h2>
       <p class="dim">Each plant grows by studying its quiz type.</p>
       {#if app.tour === 'plant'}<p class="tour-tip">Pick any flower. Cherry blossom and Tulip grow from hiragana, a gentle place to start.</p>{/if}
@@ -83,7 +106,7 @@
           <h3>{DECK_LABEL[d]}{#if !playable(d)} <span class="dim">· coming soon</span>{/if}</h3>
           <div class="picks">
             {#each speciesFor(d) as s (s)}
-              <button class="pick" disabled={!playable(d)} onclick={() => plant(s)}>
+              <button class="pick" disabled={!playable(d)} onclick={() => pick(s)}>
                 <PlantSprite species={s} stage={BLOOMED} icon />
                 <span>{SPECIES[s].label}</span>
               </button>

@@ -1,9 +1,9 @@
 import { untrack } from 'svelte'
 import type { Lesson } from '../data/build'
-import { ITEMS, deckReady, type Deck, type Item } from '../data/items'
+import { EXTRA_CARDS, ITEMS, deckReady, type Deck, type Item } from '../data/items'
 import {
   ANT_COINS, BLOOMED, COMPLETE_COINS, COOLDOWN_MS, GROW_COINS, HINT_COST, PERFECT_COINS, PLOT_COUNT, PRESERVE_COINS, PRESERVE_GROOMS, QUIZ_LENGTH,
-  SEEDED, SKIP_COST, SPECIES, WEED_BONUS_XP, WEED_COINS, WEED_EVERY_MS,
+  QUIZ_VISITORS, SEEDED, SKIP_COST, SPECIES, TEND_LENGTH, TEND_PER_DAY, WEED_BONUS_XP, WEED_COINS, WEED_EVERY_MS,
   advance, antCoinDue, canPreserve, completeQuiz, completionBonus, normalizeGarden, normalizeWeeds, plantSeed, shrinkGarden, skipRest, sproutWeeds,
   VISITOR_COINS, visitorDue, type Plot, type Species, type Weed,
 } from './garden'
@@ -14,6 +14,7 @@ import { DECOR_BY_ID, buy, move, newDecor, nextSpotPrice, normalizeDecor, openSp
 import { LOOK_BY_ID, newLook, normalizeLook, type LookState } from './look'
 import { DECOR_SPOTS, WEED_SPOTS } from './meadow'
 import { dayNumber, newStreak, normalizeStreak, studyOn, type Streak, type StudyResult } from './streak'
+import { NEW_PER_DAY, isKnown, isMastered, mostOverdue, normalizeSrs, review, seedSrs, weakest, type Srs } from './srs'
 import { nextStep, normalizeTour, type TourStep } from './tour'
 
 export type Mode = 'mix' | 'choice' | 'type'
@@ -28,6 +29,15 @@ export interface Stat {
   w: number // times wrong
   streak: number // current correct-in-a-row
   last: number // timestamp of last review
+  srs?: Srs // memory estimate and next due date (srs.ts)
+}
+
+// Counts that start over each local day.
+interface Daily {
+  day: number
+  newCards: number
+  tends: number // Tend weak words sessions started
+  visitors: number // visitors brought by finished quizzes
 }
 
 interface Saved {
@@ -48,6 +58,8 @@ interface Saved {
   debug: boolean // hidden debug tools unlocked in Settings
   lessons: Lesson[] // enabled chips: Genki lessons and/or 'n5'
   stats: Record<string, Stat>
+  daily: Daily
+  seedsUsed: number // seed packets spent; one is earned per level
   xp: number
   best: number // best combo ever
   muted: boolean
@@ -56,7 +68,7 @@ interface Saved {
 
 const KEY = 'genki-study-v1'
 
-const SAVE_VERSION = 9 // 3: coins, weeds and ants. 4: streak, collection, visitors. 5: decorations. 6: tutorial. 7: 10 plots. 8: upgrades, lawn spots, garden looks. 9: creature collection
+const SAVE_VERSION = 10 // 3: coins, weeds and ants. 4: streak, collection, visitors. 5: decorations. 6: tutorial. 7: 10 plots. 8: upgrades, lawn spots, garden looks. 9: creature collection. 10: spaced repetition, seed packets
 
 const defaults = (): Saved => ({
   version: SAVE_VERSION,
@@ -77,6 +89,8 @@ const defaults = (): Saved => ({
   debug: false,
   lessons: [1, 2],
   stats: {},
+  daily: { day: -1, newCards: 0, tends: 0, visitors: 0 },
+  seedsUsed: 0,
   xp: 0,
   best: 0,
   muted: false,
@@ -85,6 +99,24 @@ const defaults = (): Saved => ({
 
 const time = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
 const count = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0)
+
+// Saves from before version 10 have no schedule: each card gets one worked out from its counts.
+function repairStats(raw: unknown): Record<string, Stat> {
+  const out: Record<string, Stat> = {}
+  if (!raw || typeof raw !== 'object') return out
+  for (const [id, v] of Object.entries(raw as Record<string, Partial<Stat> | null>)) {
+    if (!v || typeof v !== 'object') continue
+    const s: Stat = { c: count(v.c), w: count(v.w), streak: count(v.streak), last: time(v.last) }
+    const srs = normalizeSrs(v.srs) ?? seedSrs(s)
+    out[id] = srs ? { ...s, srs } : s
+  }
+  return out
+}
+
+function repairDaily(raw: unknown): Daily {
+  const d = (raw ?? {}) as Partial<Daily>
+  return { day: typeof d.day === 'number' ? d.day : -1, newCards: count(d.newCards), tends: count(d.tends), visitors: count(d.visitors) }
+}
 
 // Make loaded or imported data safe. Fields missing from older saves already hold defaults.
 function repair(data: Saved): Saved {
@@ -112,6 +144,9 @@ function repair(data: Saved): Saved {
   data.decor = normalizeDecor(data.decor, DECOR_SPOTS.length)
   data.look = normalizeLook(data.look)
   data.mode = normalizeMode(data.mode)
+  data.stats = repairStats(data.stats)
+  data.daily = repairDaily(data.daily)
+  data.seedsUsed = count(data.seedsUsed)
   // Players from before the tutorial already know their way around.
   data.tour = data.version < 6 ? null : normalizeTour(data.tour)
   data.version = SAVE_VERSION
@@ -151,13 +186,32 @@ export function toggleLesson(n: Lesson) {
 // which chapters' vocab, kanji and grammar are in.
 const KANA: Deck[] = ['hiragana', 'katakana']
 
-export const poolFor = (deck: Deck): Item[] =>
-  ITEMS.filter((i) => i.type === deck && (KANA.includes(deck) || app.lessons.includes(i.lesson)))
+export const inChapters = (i: Item) => KANA.includes(i.type) || app.lessons.includes(i.lesson)
 
-// A card is mastered once it has been answered right this many times in a row.
-export const MASTERY_STREAK = 5
+export const poolFor = (deck: Deck): Item[] => ITEMS.filter((i) => i.type === deck && inChapters(i))
 
-export function record(id: string, correct: boolean) {
+// What a quiz can ask: the deck, plus harder versions of its mastered cards. Those come first so
+// they aren't pushed back by a long list of new cards.
+export const studyPool = (deck: Deck): Item[] => [
+  ...EXTRA_CARDS.filter((i) => i.type === deck && inChapters(i) && isMastered(app.stats[i.base!])),
+  ...poolFor(deck),
+]
+
+const DECKS: Deck[] = ['hiragana', 'katakana', 'kanji', 'vocab', 'grammar']
+
+// This local day's counts, started afresh when the day has changed.
+function today(now: number): Daily {
+  const day = dayNumber(now)
+  if (app.daily.day !== day) app.daily = { day, newCards: 0, tends: 0, visitors: 0 }
+  return app.daily
+}
+
+const countToday = (key: 'newCards' | 'tends' | 'visitors', now: number) => (app.daily.day === dayNumber(now) ? app.daily[key] : 0)
+
+export const newLeft = (now = Date.now()) => NEW_PER_DAY - countToday('newCards', now)
+
+export function record(id: string, correct: boolean, now = Date.now()) {
+  if (!app.stats[id]) today(now).newCards++
   const s = (app.stats[id] ??= { c: 0, w: 0, streak: 0, last: 0 })
   if (correct) {
     s.c++
@@ -166,8 +220,23 @@ export function record(id: string, correct: boolean) {
     s.w++
     s.streak = 0
   }
-  s.last = Date.now()
+  s.srs = review(s.srs, s.last, correct, now)
+  s.last = now
   save()
+}
+
+// Words the player has held on to for a while, counting a word in two lists once.
+export const knownWords = () => new Set(ITEMS.filter((i) => i.type === 'vocab' && isKnown(app.stats[i.id])).map((i) => i.front)).size
+
+export const tendsLeft = (now = Date.now()) => Math.max(0, TEND_PER_DAY - countToday('tends', now))
+
+export const weakItems = () => weakest(DECKS.flatMap(studyPool), app.stats, TEND_LENGTH)
+
+export function startTend(now = Date.now()): boolean {
+  if (!tendsLeft(now)) return false
+  today(now).tends++
+  save()
+  return true
 }
 
 // Whether a garden quiz is on screen.
@@ -176,6 +245,8 @@ export const quizState = $state({ open: false })
 export const XP_PER_LEVEL = 1200
 
 export const level = () => Math.floor(app.xp / XP_PER_LEVEL) + 1
+// One seed packet per level past the first: it picks the bloom colour of a plant.
+export const seedPackets = () => Math.max(0, level() - 1 - app.seedsUsed)
 // Percent of the way to the next level.
 export const levelProgress = () => ((app.xp % XP_PER_LEVEL) / XP_PER_LEVEL) * 100
 
@@ -208,6 +279,7 @@ export function importData(text: string): boolean {
 
 export function resetStats() {
   app.stats = {}
+  app.seedsUsed = 0
   app.xp = 0
   app.best = 0
   save()
@@ -217,9 +289,14 @@ export function resetStats() {
 
 const validSlot = (i: number) => Number.isInteger(i) && i >= 0 && i < PLOT_COUNT
 
-export function plantAt(i: number, species: Species): boolean {
+const foundBloom = (species: Species) => (variant: number) => !!app.collection[flowerKey(species, variant)]
+
+// `variant` picks the bloom with a seed packet; without one, it's a surprise.
+export function plantAt(i: number, species: Species, variant?: number): boolean {
   if (!validSlot(i) || app.garden[i]) return false
-  app.garden[i] = plantSeed(species, rollVariant(species, Math.random()))
+  const chosen = variant !== undefined && seedPackets() > 0
+  app.garden[i] = plantSeed(species, chosen ? variant : rollVariant(species, Math.random(), foundBloom(species)))
+  if (chosen) app.seedsUsed++
   save()
   return true
 }
@@ -244,6 +321,11 @@ export function finishQuiz(i: number, right: number, now = Date.now()): QuizRewa
   const coins = (perfect ? PERFECT_COINS : 0) + study.bonus
   app.xp += xp
   app.coins += coins
+  // Studying brings a visitor to the garden.
+  if (countToday('visitors', now) < QUIZ_VISITORS) {
+    today(now).visitors++
+    app.visitorAt = 0
+  }
   save()
   return { xp, coins, perfect, study }
 }
@@ -343,7 +425,7 @@ export function collectVisitor(coins: number, now = Date.now()): boolean {
   return true
 }
 
-// Log a visitor in the creature collection. True the first time this one is seen.
+// Log a visitor in the creature collection. True the first time this one is befriended.
 export function meetCreature(key: string, now = Date.now()): boolean {
   const first = !app.creatures[key]
   app.creatures = meet(app.creatures, key, now)
@@ -351,11 +433,13 @@ export function meetCreature(key: string, now = Date.now()): boolean {
   return first
 }
 
-// A word for a visitor to bring: vocab from the enabled chapters, leaning on words already met and
-// often missed, so it works as a reminder. Falls back to kanji, then to any vocab.
+// A word for a visitor to bring: vocab from the enabled chapters, the most overdue one if any is due,
+// else leaning on words already met and often missed. Falls back to kanji, then to any vocab.
 export function reminderItem(): Item | null {
   const pool = [poolFor('vocab'), poolFor('kanji'), ITEMS.filter((i) => i.type === 'vocab')].find((p) => p.length) ?? []
   const seen = pool.filter((i) => app.stats[i.id])
+  const due = mostOverdue(seen, app.stats, Date.now())
+  if (due) return due
   const from = seen.length >= 5 ? seen : pool
   if (!from.length) return null
   const weight = (i: Item) => 1 + (app.stats[i.id]?.w ?? 0)
@@ -545,7 +629,7 @@ export function debugFill() {
     if (p) return p
     const sp = species[Math.floor(Math.random() * species.length)]
     const stage = SEEDED + Math.floor(Math.random() * BLOOMED)
-    return { ...plantSeed(sp, rollVariant(sp, Math.random())), stage, waters: stage - SEEDED }
+    return { ...plantSeed(sp, rollVariant(sp, Math.random(), foundBloom(sp))), stage, waters: stage - SEEDED }
   })
   for (const p of app.garden) if (p?.stage === BLOOMED) app.collection = discover(app.collection, p.species, p.variant, Date.now())
   save()

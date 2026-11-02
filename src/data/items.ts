@@ -15,6 +15,8 @@ export interface Item {
   answers: string[] // accepted typed answers (lowercase)
   tag: string // small label shown above the prompt, e.g. 'basic' or 'Lesson 3'
   hint?: string // optional extra shown under the prompt (a reading, a translation)
+  side?: 'reverse' | 'reading' // a harder version of the card `base`, asked as multiple choice only
+  base?: string
 }
 
 // [hiragana, romaji, ...alternate accepted romaji]
@@ -85,6 +87,17 @@ export const ITEMS: Item[] = [
   ...kanjiItems(),
   ...grammarItems(),
 ]
+
+// Harder versions of a card, each scheduled on its own and unlocked once the original is mastered:
+// English to Japanese for vocab, and the readings for kanji.
+export const SIDE_LABEL = { reverse: 'English to Japanese', reading: 'Reading' }
+
+export const EXTRA_CARDS: Item[] = ITEMS.flatMap((it): Item[] => {
+  const { hint, ...rest } = it
+  if (it.type === 'vocab') return [{ ...rest, id: `r-${it.id}`, side: 'reverse', base: it.id, front: it.back, back: it.front, answers: [it.front] }]
+  if (it.type === 'kanji' && hint) return [{ ...rest, id: `y-${it.id}`, side: 'reading', base: it.id, back: hint, answers: [hint], hint: it.back }]
+  return []
+})
 
 // A deck needs at least this many items before its plant can be planted.
 export const MIN_DECK_SIZE = 10

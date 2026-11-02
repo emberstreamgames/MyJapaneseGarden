@@ -1,5 +1,7 @@
-// The creatures that visit the garden, and the pure rules for the collection of those seen. Tapping
-// one logs it. Entries are keyed by creature and look id, never by position, so a look can be cut
+import { FAVOUR_NEW, pickWeighted } from './roll'
+
+// The creatures that visit the garden, and the pure rules for the collection of those seen. Answering
+// one's note logs it. Entries are keyed by creature and look id, never by position, so a look can be cut
 // from these lists without shifting anyone's save. CreatureSprite.svelte draws them.
 
 export interface Look {
@@ -211,12 +213,13 @@ export const findLook = (c: Creature, id: string): Look => looksOf(c).find((l) =
 // Every entry in display order.
 export const ALL_CREATURES = CREATURE_LIST.flatMap((creature) => looksOf(creature).map((look) => ({ creature, look, key: creatureKey(creature, look.id) })))
 
-// Which visitor comes next: an even chance of each creature, then of each of its looks.
+// Which visitor comes next: a creature, then one of its looks, favouring what hasn't been `seen` yet.
 // `r` and `s` are random numbers in [0, 1).
-export function rollCreature(r: number, s: number): { creature: Creature; look: string } {
-  const creature = CREATURE_LIST[Math.floor(r * CREATURE_LIST.length)]
+export function rollCreature(r: number, s: number, seen: (key: string) => boolean = () => false): { creature: Creature; look: string } {
+  const unseen = (c: Creature) => looksOf(c).some((l) => !seen(creatureKey(c, l.id)))
+  const creature = CREATURE_LIST[pickWeighted(CREATURE_LIST.map((c) => (unseen(c) ? FAVOUR_NEW : 1)), r)]
   const looks = looksOf(creature)
-  return { creature, look: looks[Math.floor(s * looks.length)].id }
+  return { creature, look: looks[pickWeighted(looks.map((l) => (seen(creatureKey(creature, l.id)) ? 1 : FAVOUR_NEW)), s)].id }
 }
 
 export interface Seen {

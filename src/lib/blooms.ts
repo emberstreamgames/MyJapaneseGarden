@@ -1,5 +1,6 @@
 import { ART, HYDRANGEA_BLOOMS, LAVENDER_BUDS, type Layer } from './plants'
 import type { Species } from './garden'
+import { FAVOUR_NEW, pickWeighted } from './roll'
 
 // Colour variants for open flowers. Each plot rolls one when planted (0 = the species' original colours), and it
 // stays hidden until the plant blooms. Variants only repaint the shapes from plants.ts; they never change them.
@@ -174,8 +175,9 @@ export const BLOOMS: Record<Species, Bloom[]> = {
   ],
 }
 
-// Variant ids run 0 (original) to BLOOMS[s].length, each equally likely. `r` is a random number in [0, 1).
-export const rollVariant = (s: Species, r: number) => Math.min(BLOOMS[s].length, Math.floor(r * (BLOOMS[s].length + 1)))
+// Variant ids run 0 (original) to BLOOMS[s].length. Ones not yet `found` are favoured. `r` is a random number in [0, 1).
+export const rollVariant = (s: Species, r: number, found: (variant: number) => boolean = () => false) =>
+  pickWeighted(Array.from({ length: BLOOMS[s].length + 1 }, (_, v) => (found(v) ? 1 : FAVOUR_NEW)), r)
 export const bloomName = (s: Species, v: number) => BLOOMS[s][v - 1]?.name ?? ''
 
 const ang = (l: Layer, k: number) => l.rot + (k * 360) / l.n

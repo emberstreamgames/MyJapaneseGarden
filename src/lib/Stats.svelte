@@ -1,14 +1,15 @@
 <script lang="ts">
-  import { DECK_LABEL, ITEMS, type Deck, type Item } from '../data/items'
+  import { DECK_LABEL, EXTRA_CARDS, ITEMS, type Deck, type Item } from '../data/items'
   import pkg from '../../package.json'
   import ConfirmSheet from './ConfirmSheet.svelte'
   import { BLOOMED, PLOT_COUNT } from './garden'
   import { FLOWERS } from './collection'
-  import { app, MASTERY_STREAK, exportData, importData, level, poolFor, resetGarden, resetStats, save, setTour } from './store.svelte'
+  import { app, exportData, importData, level, poolFor, resetGarden, resetStats, save, setTour } from './store.svelte'
+  import { MASTERY_DAYS, isMastered } from './srs'
   import { dayNumber, liveStreak } from './streak'
 
   const rows = $derived(
-    ITEMS.map((it) => ({ it, s: app.stats[it.id] })).filter((r): r is { it: Item; s: NonNullable<typeof r.s> } => !!r.s),
+    [...ITEMS, ...EXTRA_CARDS].map((it) => ({ it, s: app.stats[it.id] })).filter((r): r is { it: Item; s: NonNullable<typeof r.s> } => !!r.s),
   )
   const missed = $derived([...rows].filter((r) => r.s.w > 0).sort((a, b) => b.s.w - a.s.w || a.s.c - b.s.c).slice(0, 10))
   const best = $derived(
@@ -33,7 +34,7 @@
     DECKS.flatMap((d) => {
       const pool = poolFor(d)
       if (!pool.length) return []
-      const done = pool.filter((i) => (app.stats[i.id]?.streak ?? 0) >= MASTERY_STREAK).length
+      const done = pool.filter((i) => isMastered(app.stats[i.id])).length
       const f = done / pool.length
       // The leaf rides the tip of the ring, from the top round clockwise.
       const a = f * 2 * Math.PI - Math.PI / 2
@@ -61,7 +62,7 @@
     const url = URL.createObjectURL(new Blob([exportData()], { type: 'application/json' }))
     const a = document.createElement('a')
     a.href = url
-    a.download = `genki-progress-${new Date().toISOString().slice(0, 10)}.json`
+    a.download = `japanese-garden-progress-${new Date().toISOString().slice(0, 10)}.json`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -110,7 +111,7 @@
   </div>
 
   <h3>Mastery</h3>
-  <p class="dim">A card is mastered after {MASTERY_STREAK} right answers in a row. Each ring counts the cards in your review pool.</p>
+  <p class="dim">A card is mastered once you can hold on to it for about {Math.round(MASTERY_DAYS / 7)} weeks, and that unlocks a harder version of it. Forget it and it can drop back out. Each ring counts the cards in your review pool.</p>
   <div class="rings">
     {#each mastery as m (m.d)}
       <div class="ring-tile" class:full={m.done === m.total}>
@@ -176,5 +177,12 @@
     </ConfirmSheet>
   {/if}
 
-  <p class="dim ver"><button class="linkish" onclick={tapVersion}>Genki Grow v{pkg.version}</button></p>
+  <h3>Credits</h3>
+  <div class="credits dim">
+    <p>Word and kanji selection follows the JLPT lists by Jonathan Waller, <a href="https://www.tanos.co.uk/jlpt/" target="_blank" rel="noopener">tanos.co.uk</a> (CC BY).</p>
+    <p>JLPT levels here are estimates: the test's organizers publish no official lists.</p>
+    <p>Review scheduling by <a href="https://github.com/open-spaced-repetition/ts-fsrs" target="_blank" rel="noopener">ts-fsrs</a> (MIT). Built with <a href="https://svelte.dev" target="_blank" rel="noopener">Svelte</a> (MIT).</p>
+  </div>
+
+  <p class="dim ver"><button class="linkish" onclick={tapVersion}>My Japanese Garden v{pkg.version}</button></p>
 </section>

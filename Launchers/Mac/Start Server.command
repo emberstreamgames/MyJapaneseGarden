@@ -30,7 +30,7 @@ fi
 ip=$(ipconfig getifaddr en0 || ipconfig getifaddr en1)
 
 echo
-echo "Starting Genki Study..."
+echo "Starting My Japanese Garden..."
 echo "  This Mac:  http://localhost:5173"
 [[ -n $ip ]] && echo "  Phone/PC:  http://$ip:5173"
 echo

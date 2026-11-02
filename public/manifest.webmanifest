@@ -1,7 +1,7 @@
 {
   "name": "My Japanese Garden",
-  "short_name": "Genki Grow",
-  "description": "Genki I flashcards and a garden that grows as you study.",
+  "short_name": "Japanese Garden",
+  "description": "Japanese flashcards and a garden that grows as you study.",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",

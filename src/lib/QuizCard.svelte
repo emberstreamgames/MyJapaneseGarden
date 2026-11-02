@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { DECK_LABEL, DECK_PROMPT } from '../data/items'
+  import { DECK_LABEL, DECK_PROMPT, SIDE_LABEL } from '../data/items'
   import { HINT_COST } from './garden'
   import { CHEERS, type Quiz } from './quiz.svelte'
   import { app } from './store.svelte'
@@ -24,7 +24,8 @@
   // A right answer moves on by itself, unless there's something new to read: a kanji's readings
   // only appear now, so that card waits (unless they were already bought).
   $effect(() => {
-    if (!auto || quiz.result !== 'right' || (quiz.current?.type === 'kanji' && !quiz.revealed)) return
+    const c = quiz.current
+    if (!auto || quiz.result !== 'right' || (c?.type === 'kanji' && !c.side && !quiz.revealed)) return
     const t = setTimeout(onNext, AUTO_NEXT_MS)
     return () => clearTimeout(t)
   })
@@ -41,12 +42,13 @@
 
 {#if quiz.current}
   {@const current = quiz.current}
+  {@const reversed = current.side === 'reverse'}
   {#key current.id}
     <div class="stage">
       {#key quiz.shake}
         <div class="card" class:shake={quiz.result === 'wrong'} class:right={quiz.result === 'right'}>
-          <div class="tagline">{DECK_LABEL[quiz.deck]} · {current.tag}</div>
-          <div class="big" class:mid={current.front.length === 4} class:long={current.front.length > 4} lang="ja">{current.front}</div>
+          <div class="tagline">{DECK_LABEL[current.type]} · {current.side ? SIDE_LABEL[current.side] : current.tag}</div>
+          <div class="big" class:mid={!reversed && current.front.length === 4} class:long={reversed || current.front.length > 4} lang={reversed ? 'en' : 'ja'}>{current.front}</div>
           {#if quiz.hintLocked}
             <div class="hint-buy">
               <button disabled={app.coins < HINT_COST} onclick={reveal}>🪙 {HINT_COST} · Show readings</button>
@@ -60,7 +62,7 @@
             {#if !quiz.result}
               <form onsubmit={(e) => quiz.submitTyped(e)}>
                 <!-- svelte-ignore a11y_autofocus -->
-                <input bind:this={input} bind:value={quiz.typed} autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder={DECK_PROMPT[quiz.deck]} autofocus />
+                <input bind:this={input} bind:value={quiz.typed} autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder={DECK_PROMPT[current.type]} autofocus />
                 <button class="primary" type="submit">Check</button>
               </form>
             {:else}
@@ -71,6 +73,7 @@
               {#each quiz.options as o (o)}
                 <button
                   class="choice"
+                  lang={current.side ? 'ja' : undefined}
                   class:ok={quiz.result && o === current.back}
                   class:no={quiz.result && o === quiz.picked && o !== current.back}
                   disabled={!!quiz.result}
@@ -82,11 +85,13 @@
 
           {#if quiz.result === 'wrong'}
             <p class="explain">
-              {#if quiz.deck === 'grammar'}
+              {#if current.type === 'grammar'}
                 The missing word is <b>{current.back}</b>
+              {:else if current.side === 'reverse'}
+                “{current.front}” is <b lang="ja">{current.back}</b>
               {:else}
                 <span lang="ja">{current.front}</span>
-                {quiz.deck === 'hiragana' || quiz.deck === 'katakana' ? 'is read' : 'means'}
+                {current.type === 'hiragana' || current.type === 'katakana' || current.side === 'reading' ? 'is read' : 'means'}
                 <b>“{current.back}”</b>
               {/if}
               {#if quiz.kind === 'type' && quiz.typed.trim()}<span class="dim">You typed “{quiz.typed.trim()}”.</span>{/if}
