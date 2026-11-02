@@ -36,7 +36,8 @@
 
   let visitor = $state<Visitor | null>(null)
   // `friend`: this answer befriended a new creature, so the card stays open to say so.
-  let card = $state<{ v: Visitor; item: Item | null; coins: number; shown: boolean; friend: boolean } | null>(null)
+  // `mastered`: this answer mastered the word, so it stays open to say that too.
+  let card = $state<{ v: Visitor; item: Item | null; coins: number; shown: boolean; friend: boolean; mastered: boolean } | null>(null)
   let gain = $state<{ id: number; x: number; y: number; coins: number } | null>(null)
   let n = 0
   let el: SVGGElement | undefined
@@ -148,7 +149,7 @@
   function tap() {
     const v = visitor
     if (!v || v.state === 'out') return
-    card = { v, item: reminderItem(), coins: visitorCoins(Math.random()), shown: false, friend: false }
+    card = { v, item: reminderItem(), coins: visitorCoins(Math.random()), shown: false, friend: false, mastered: false }
     if (!app.muted) sfx[CREATURES[v.creature].call]()
   }
 
@@ -157,11 +158,10 @@
   function thank(knew?: boolean) {
     if (!card) return
     const { v, item } = card
-    if (item && knew !== undefined) record(item.id, knew)
-    if (meetCreature(creatureKey(v.creature, v.look))) {
-      card.friend = true
-      if (!app.muted) sfx.fanfare()
-    } else finish()
+    card.mastered = !!item && knew !== undefined && record(item.id, knew).mastered
+    card.friend = meetCreature(creatureKey(v.creature, v.look))
+    if (!card.friend && !card.mastered) return finish()
+    if (!app.muted) sfx.fanfare()
   }
 
   function finish() {
@@ -229,7 +229,8 @@
       <h2>{aLabel(c.v.creature)} stopped by!</h2>
       <p class="variant">{findLook(c.v.creature, c.v.look).name} · <span lang="ja">{info.jp}</span></p>
       {#if c.friend}<p class="discovery">✨ New friend! Added to your collection</p>{/if}
-      {#if c.item && !c.friend}
+      {#if c.mastered && c.item}<p class="discovery">🌸 Mastered! <span lang="ja">{c.item.front}</span> {c.item.back}</p>{/if}
+      {#if c.item && !c.friend && !c.mastered}
         <p class="dim">{c.shown ? 'It brought you this word:' : 'It brought you a word. Do you remember it?'}</p>
         <div class="vword">
           <div class="big" class:long={c.item.front.length > 4} lang="ja">{c.item.front}</div>
@@ -239,7 +240,7 @@
         </div>
       {/if}
       <p class="coins">and a little gift: +{c.coins} 🪙</p>
-      {#if c.friend}
+      {#if c.friend || c.mastered}
         <button class="primary big-btn" onclick={finish}>ありがとう!</button>
       {:else if !c.item}
         <button class="primary big-btn" onclick={() => thank()}>ありがとう! Thank you</button>

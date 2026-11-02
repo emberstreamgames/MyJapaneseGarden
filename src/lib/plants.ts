@@ -81,6 +81,11 @@ export const ART: Record<Species, Art> = {
   },
   lavender: { layers: [], bud: '#9a8fd0', custom: 'lavender' },
   hydrangea: { layers: [], bud: '#8fb0e8', custom: 'hydrangea' },
+  starter: {
+    layers: [{ n: 6, rot: 0, shape: 'oval', off: 10, rx: 6.5, ry: 9.5, color: '#ffe9a8' }],
+    center: { r: 4.5, color: '#ff9f5a' },
+    bud: '#ffd873',
+  },
 }
 
 // Hand-placed bits for the custom heads, relative to the head centre.

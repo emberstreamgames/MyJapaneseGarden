@@ -1,6 +1,6 @@
 <script lang="ts">
   import PlantSprite from '../lib/PlantSprite.svelte'
-  import { BLOOMED, COOLDOWN_MS, PRESERVE_GROOMS, QUIZ_LENGTH, SPECIES, type Species } from '../lib/garden'
+  import { BLOOMED, COOLDOWN_MS, GROWABLE, PRESERVE_GROOMS, QUIZ_LENGTH, SPECIES, type Species } from '../lib/garden'
   import { FLOWERS } from '../lib/collection'
   import { DECOR_SPOTS, VIEW } from '../lib/meadow'
   import { deckReady } from '../data/items'
@@ -94,7 +94,7 @@
   // Study load. A plot takes one quiz per cooldown, so a full garden asks for about one quiz per plot a day.
   const SECONDS_PER_QUESTION = 12
   const QUIZZES_PER_FLOWER = BLOOMED - 1 + PRESERVE_GROOMS // waterings to bloom, then grooms to preserve
-  const SPECIES_LIST = Object.keys(SPECIES) as Species[]
+  const SPECIES_LIST: Species[] = GROWABLE
   const OPEN_SPECIES = SPECIES_LIST.filter((s) => deckReady(SPECIES[s].deck))
   const perDay = (n: number) => n * Math.min(1, 24 / (COOLDOWN_MS / 3_600_000))
   const load = (n: number) => {

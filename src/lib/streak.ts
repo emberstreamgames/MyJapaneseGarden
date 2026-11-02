@@ -26,6 +26,16 @@ export function streakBonus(count: number): number {
   return count >= 30 && count % 30 === 0 ? 100 : 0
 }
 
+// The next streak length that pays coins.
+export function nextMilestone(count: number): { day: number; coins: number } {
+  let day = count + 1
+  while (!streakBonus(day)) day++
+  return { day, coins: streakBonus(day) }
+}
+
+// Study days until the next rain day is earned.
+export const daysToRain = (count: number) => STREAK_RAIN_EVERY - (count % STREAK_RAIN_EVERY)
+
 // Days missed since the last study day that rain days can't cover; 0 means the streak is alive.
 const uncovered = (s: Streak, today: number) => (s.day < 0 ? Infinity : Math.max(0, today - s.day - 1 - s.rain))
 

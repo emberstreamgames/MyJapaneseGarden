@@ -8,12 +8,24 @@ export type Kind = 'choice' | 'type'
 
 // Said after a wrong answer, with any Japanese glossed so it can be read at any level.
 export const CHEERS = [
-  { en: 'Almost!', ja: 'がんばって', gloss: 'ganbatte: “hang in there”' },
+  { en: 'Hang in there!', ja: 'がんばって', gloss: 'ganbatte: “hang in there”' },
   { en: 'Not quite.', ja: 'ドンマイ', gloss: 'donmai: “don’t worry about it”' },
-  { en: 'So close!', ja: 'だいじょうぶ', gloss: 'daijōbu: “it’s okay”' },
+  { en: 'That’s okay!', ja: 'だいじょうぶ', gloss: 'daijōbu: “it’s okay”' },
   { en: 'Keep going!', ja: 'もういちど', gloss: 'mō ichido: “one more time”' },
   { en: 'Nice try!', ja: 'ファイト', gloss: 'faito: “you can do it”' },
 ]
+
+// Only for a typed answer that really was nearly right (nearMiss).
+export const NEAR_MISS = { en: 'So close!', ja: 'おしい', gloss: 'oshii: “so close”' }
+
+// Said after a right answer: a plain word, or something bigger on a combo milestone.
+const PLAIN_PRAISE = ['Correct!', 'Nice!', 'Yes!', 'That’s it!', 'Got it!']
+const COMBO_PRAISE: Record<number, { ja: string; gloss: string }> = {
+  3: { ja: 'いいね!', gloss: 'ii ne: “nice”' },
+  5: { ja: 'すごい!', gloss: 'sugoi: “amazing”' },
+  7: { ja: 'さすが!', gloss: 'sasuga: “just what I’d expect from you”' },
+  10: { ja: 'かんぺき!', gloss: 'kanpeki: “perfect”' },
+}
 
 // "to wear (on the body)" also passes as "to wear" or "wear". This lives here, not in the data rows,
 // because rows sharing an answer never appear as each other's choices (docs/CONTENT.md).
@@ -24,6 +36,27 @@ export function accepted(it: Item, typed: string): boolean {
     const bare = a.replace(/\s*\([^)]*\)/g, '').trim()
     return !!bare && (bare === typed || bare.replace(/^to /, '') === typed)
   })
+}
+
+// How many edits turn `a` into `b`.
+function editDistance(a: string, b: string): number {
+  let row = Array.from({ length: b.length + 1 }, (_, i) => i)
+  for (let i = 1; i <= a.length; i++) {
+    const next = [i]
+    for (let j = 1; j <= b.length; j++) next[j] = Math.min(row[j] + 1, next[j - 1] + 1, row[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1))
+    row = next
+  }
+  return row[b.length]
+}
+
+// A typo's distance from a right answer. Short answers don't count: "ka" and "ki" are different kana,
+// not a slip, and one letter is a much bigger share of a four-letter word than of a long one.
+export function nearMiss(it: Item, typed: string): boolean {
+  const forms = it.answers.flatMap((a) => {
+    const bare = a.replace(/\s*\([^)]*\)/g, '').trim()
+    return [a, bare, bare.replace(/^to /, '')]
+  })
+  return forms.some((a) => a.length >= 4 && editDistance(a, typed) <= (a.length >= 9 ? 2 : 1))
 }
 
 // The question/answer engine shared by free practice and the garden quizzes.
@@ -42,6 +75,13 @@ export class Quiz {
   shake = $state(0)
   answered = $state(0) // questions answered since this quiz was created
   cheer = $state(0) // index into CHEERS for the last wrong answer
+  near = $state(false) // the last wrong answer was a typed near miss
+  unsure = $state(false) // the player said they didn't know this one
+  isNew = $state(false) // the player has never been asked this card
+  praise = $state<{ en: string; ja?: string; gloss?: string; big?: boolean }>({ en: PLAIN_PRAISE[0] })
+  xp = $state(0) // XP from answers since this quiz was created
+  mastered = $state<{ item: Item; unlocked: boolean }[]>([]) // cards this quiz carried over the mastery line
+  justMastered = $state(false) // the last answer did
   revealed = $state(false) // the player paid to see this question's hint
   missed = $state<{ item: Item; fixed: boolean }[]>([]) // cards missed, each once; fixed once right on review
   reviewing = $state(false) // the round after a quiz that asks misses again
@@ -120,6 +160,10 @@ export class Quiz {
     this.result = null
     this.picked = ''
     this.revealed = false
+    this.near = false
+    this.unsure = false
+    this.justMastered = false
+    this.isNew = !app.stats[pick.id]
     // Japanese can't be typed on every keyboard, so harder versions are always multiple choice.
     const kinds: Kind[] = pick.side ? ['choice'] : app.mode === 'mix' ? ['choice', 'type'] : [app.mode]
     this.kind = kinds[Math.floor(Math.random() * kinds.length)]
@@ -142,7 +186,7 @@ export class Quiz {
     this.options = [...picks, it.back].sort(() => Math.random() - 0.5)
   }
 
-  answer(ok: boolean) {
+  answer(ok: boolean, quiet = false) {
     if (!this.current || this.result) return
     this.result = ok ? 'right' : 'wrong'
     const id = this.current.id
@@ -154,7 +198,12 @@ export class Quiz {
     } else {
       this.answered++
       const seen = !!app.stats[id]
-      record(id, ok)
+      const crossed = record(id, ok)
+      // A harder version reaching mastery unlocks nothing and isn't a new milestone.
+      if (crossed.mastered && !this.current.side) {
+        this.mastered.push({ item: this.current, unlocked: EXTRA_CARDS.some((e) => e.base === id) })
+        this.justMastered = true
+      }
       if (!seen) this.met++
       else if (ok) this.stronger++
       if (!ok && !this.missed.some((m) => m.item.id === id)) this.missed.push({ item: this.current, fixed: false })
@@ -167,8 +216,10 @@ export class Quiz {
         if (this.combo > this.bestCombo) this.bestCombo = this.combo
         const amount = this.cards?.() ? TEND_XP : 10 + Math.min(this.combo, 10) * 2
         app.xp += amount
+        this.xp += amount
         this.gain = { id: ++this.n, amount }
       }
+      this.praise = this.praiseNow(review)
       const combo = this.combo
       this.burst = {
         id: ++this.n,
@@ -179,18 +230,34 @@ export class Quiz {
         }),
       }
       // A level-up has its own popup and sound (LevelUp.svelte).
-      if (!app.muted) sfx.good(this.combo)
+      if (!app.muted) {
+        sfx.good(this.combo)
+        if (this.justMastered) setTimeout(sfx.fanfare, 250)
+      }
     } else {
       if (!review) {
         this.combo = 0
         this.session.wrong++
       }
-      this.shake = ++this.n
+      if (!quiet) this.shake = ++this.n
       // A different one each time.
       this.cheer = (this.cheer + 1 + Math.floor(Math.random() * (CHEERS.length - 1))) % CHEERS.length
-      if (!app.muted) sfx.bad()
+      if (!app.muted && !quiet) sfx.bad()
     }
     if (!review) save()
+  }
+
+  private praiseNow(review: boolean) {
+    const milestone = !review && COMBO_PRAISE[this.combo]
+    return milestone ? { en: `${this.combo} in a row!`, ...milestone, big: true } : { en: PLAIN_PRAISE[Math.floor(Math.random() * PLAIN_PRAISE.length)] }
+  }
+
+  // Better than typing nonsense or guessing: it counts as a miss, without the buzzer.
+  dontKnow() {
+    if (!this.current || this.result) return
+    this.unsure = true
+    this.typed = ''
+    this.answer(false, true)
   }
 
   submitTyped(e: Event) {
@@ -198,7 +265,9 @@ export class Quiz {
     if (!this.current || this.result) return
     const t = this.typed.trim().toLowerCase()
     if (!t) return
-    this.answer(accepted(this.current, t))
+    const ok = accepted(this.current, t)
+    this.near = !ok && nearMiss(this.current, t)
+    this.answer(ok)
   }
 
   choose(o: string) {

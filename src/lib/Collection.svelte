@@ -3,7 +3,7 @@
   import CreatureBook from './CreatureBook.svelte'
   import { FLOWERS, flowerKey, flowerName } from './collection'
   import FlowerHead from './FlowerHead.svelte'
-  import { PRESERVE_GROOMS, SPECIES, type Species } from './garden'
+  import { GROWABLE, PRESERVE_GROOMS, SPECIES } from './garden'
   import * as sfx from './sfx'
   import { app, type Preserved } from './store.svelte'
 
@@ -13,7 +13,7 @@
 
   let tab = $state<'flowers' | 'creatures'>('flowers')
 
-  const groups = (Object.keys(SPECIES) as Species[]).map((species) => ({ species, flowers: FLOWERS.filter((f) => f.species === species) }))
+  const groups = GROWABLE.map((species) => ({ species, flowers: FLOWERS.filter((f) => f.species === species) }))
   const found = $derived(FLOWERS.filter((f) => app.collection[f.key]).length)
   const done = $derived(FLOWERS.filter((f) => app.collection[f.key]?.pressed).length)
   const freshKey = $derived(fresh ? flowerKey(fresh.species, fresh.variant) : '')

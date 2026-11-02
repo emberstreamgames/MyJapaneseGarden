@@ -4,7 +4,7 @@
   import ConfirmSheet from './ConfirmSheet.svelte'
   import { BLOOMED, PLOT_COUNT } from './garden'
   import { FLOWERS } from './collection'
-  import { app, exportData, importData, level, poolFor, resetGarden, resetStats, save, setTour } from './store.svelte'
+  import { app, chapterSheet, exportData, importData, level, poolFor, resetGarden, resetStats, save, setTour } from './store.svelte'
   import { MASTERY_DAYS, isMastered } from './srs'
   import { dayNumber, liveStreak } from './streak'
 
@@ -111,7 +111,8 @@
   </div>
 
   <h3>Mastery</h3>
-  <p class="dim">A card is mastered once you can hold on to it for about {Math.round(MASTERY_DAYS / 7)} weeks, and that unlocks a harder version of it. Forget it and it can drop back out. Each ring counts the cards in your review pool.</p>
+  <p class="dim">A card is mastered once you can hold on to it for about {Math.round(MASTERY_DAYS / 7)} weeks, and that unlocks a harder version of it. Forget it and it can drop back out. Each ring counts the cards in your chosen chapters.</p>
+  <button class="stats-chapters" onclick={() => (chapterSheet.open = true)}>📚 Choose chapters</button>
   <div class="rings">
     {#each mastery as m (m.d)}
       <div class="ring-tile" class:full={m.done === m.total}>

@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { COOLDOWN_MS, SPECIES, STAGE_NAMES, msUntilReady, formatWait, phaseOf, type Plot } from './garden'
+  import { COOLDOWN_MS, SPECIES, STAGE_NAMES, STARTER, msUntilReady, formatWait, phaseOf, type Plot } from './garden'
   import { CELL, GROW, PAD, PLANT_SCALE, SPOTS, VIEW } from './meadow'
   import PlantSprite from './PlantSprite.svelte'
   import { STEM_TOP } from './plants'
 
-  let { plot, index, now, growing = false, onclick }: { plot: Plot | null; index: number; now: number; growing?: boolean; onclick: () => void } = $props()
+  let { plot, index, now, growing = false, leaving = false, onclick }: { plot: Plot | null; index: number; now: number; growing?: boolean; leaving?: boolean; onclick: () => void } = $props()
 
   // Plants are drawn at PLANT_SCALE of their 100-unit sprite. The art box is sprite-sized, with the
   // sprite's ground point (50, 86) on this plot's spot; the ground layer uses bed units around it.
@@ -46,7 +46,7 @@
 </script>
 
 <!-- The art overflows its box, so only the painted plant, its badge and the soil pad take taps. -->
-<div class="plot {phase ?? 'empty'}" class:growing style={place}>
+<div class="plot {phase ?? 'empty'}" class:growing class:leaving class:starter={plot?.species === STARTER} style={place}>
   <svg class="ground" style={artBox} viewBox={groundView} aria-hidden="true">
     <g transform="scale({GROW})">
       <ellipse class="glow" rx="28" ry="10" />
@@ -70,7 +70,7 @@
     <!-- Taps on the painted plant or its badge count too; the button below covers keyboard use. -->
     <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
     <div class="art" style={artBox} {onclick}><PlantSprite species={plot.species} stage={plot.stage} variant={plot.variant} soil={false} /></div>
-    {#if badge && !growing}
+    {#if badge && !growing && !leaving}
       <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
       {#if phase === 'resting'}
         <!-- Sleeping: three Zs drift up and fade in turn. -->

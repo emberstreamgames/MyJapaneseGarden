@@ -28,6 +28,21 @@
       text: 'This garden grows as you study Japanese. Every plant is linked to a kind of question: hiragana, katakana, kanji, vocab or grammar. Answer its questions to water it, and it grows day by day until it blooms.',
       next: 'Next',
     },
+    'starter-water': {
+      title: 'Your starter plant',
+      text: 'Here’s a little plant to get you going. The 💧 means it’s thirsty, and a plant drinks when you answer its questions. Tap the 💧.',
+      target: find('.plot.starter .badge'),
+    },
+    'starter-grow': {
+      title: 'Ready to grow',
+      text: 'Well done! A watered plant rests for most of a day, then shows a ✨. Your starter is a quick grower, so it’s ready already. Tap the ✨.',
+      target: find('.plot.starter.ready .badge'),
+    },
+    'starter-groom': {
+      title: 'In full bloom!',
+      text: 'A bloom stays healthy with grooming, shown by the ✂️. Normally that takes a quiz, but this one’s on the house. Tap the ✂️.',
+      target: find('.plot.starter .badge'),
+    },
     hud: {
       title: 'Level and coins',
       text: 'Up here are your level, your XP bar and your coins. Right answers earn XP. Coins come from growing plants and from little surprises around the garden. Let’s find some!',
@@ -36,7 +51,7 @@
     },
     visitor: {
       title: 'A visitor!',
-      text: 'Butterflies and birds drop by now and then, each with a word to review. Tap it to say hello.',
+      text: 'Creatures drop by now and then, each with a word to review. Tap this one to say hello.',
       target: find('.visitors .visitor'),
     },
     ant: {
@@ -51,7 +66,7 @@
     },
     plant: {
       title: 'Plant a seed',
-      text: 'Tap an empty plot and pick a flower. Each flower grows from a different kind of question.',
+      text: 'Your starter has gone to seed, so it’s time for a plant of your own! Tap an empty plot and pick a flower. Each flower grows from a different kind of question.',
       // The middle plot of the third row, if it's free.
       target: () => {
         const plots = document.querySelectorAll('.bed .plot')
