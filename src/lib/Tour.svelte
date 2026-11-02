@@ -1,11 +1,12 @@
 <script lang="ts">
   import { untrack } from 'svelte'
   import ConfirmSheet from './ConfirmSheet.svelte'
+  import Mochi from './Mochi.svelte'
   import { phaseOf } from './garden'
   import { app, prepTour, setTour, tourDid } from './store.svelte'
   import { TOUR_STEPS, type TourStep } from './tour'
 
-  // The new-player tutorial: a card pinned to the top or bottom of the screen, and a spotlight on
+  // The new-player tutorial, led by Mochi: a card pinned to the top or bottom of the screen, and a spotlight on
   // what to tap. Steps with a Next button only explain; the others wait for the player to act
   // (tourDid calls in the garden's components). The card steps aside while a sheet, quiz, menu or
   // level-up is open, unless the step is about that sheet.
@@ -30,22 +31,22 @@
     },
     'starter-water': {
       title: 'Your starter plant',
-      text: 'Here’s a little plant to get you going. The 💧 means it’s thirsty, and a plant drinks when you answer its questions. Tap the 💧.',
+      text: 'Here’s a little plant to get you going. When it thinks of a water drop, it’s thirsty, and a plant drinks when you answer its questions. Tap the drop.',
       target: find('.plot.starter .badge'),
     },
     'starter-grow': {
       title: 'Ready to grow',
-      text: 'Well done! A watered plant rests for most of a day, then shows a ✨. Your starter is a quick grower, so it’s ready already. Tap the ✨.',
+      text: 'Well done! A watered plant rests for most of a day, then thinks of a star. Your starter is a quick grower, so it’s ready already. Tap the star.',
       target: find('.plot.starter.ready .badge'),
     },
     'starter-groom': {
       title: 'In full bloom!',
-      text: 'A bloom stays healthy with grooming, shown by the ✂️. Normally that takes a quiz, but this one’s on the house. Tap the ✂️.',
+      text: 'A bloom stays healthy with grooming, shown by the scissors. Normally that takes a quiz, but this one’s on the house. Tap the scissors.',
       target: find('.plot.starter .badge'),
     },
     hud: {
       title: 'Level and coins',
-      text: 'Up here are your level, your XP bar and your coins. Right answers earn XP. Coins come from growing plants and from little surprises around the garden. Let’s find some!',
+      text: 'Up on the sign are your level, your XP bar and your coins. Right answers earn XP. Coins come from growing plants and from little surprises around the garden. Let’s find some!',
       target: find('.garden .hud'),
       next: 'Next',
     },
@@ -89,7 +90,7 @@
     },
     water: {
       title: 'Time to water',
-      text: 'The 💧 means your seed is thirsty. Tap it.',
+      text: 'The water drop means your seed is thirsty. Tap it.',
       target: find('.plot.thirsty .badge'),
     },
     quiz: {
@@ -103,7 +104,7 @@
 
   const step = $derived(app.tour && STEPS[app.tour])
   const n = $derived(app.tour ? TOUR_STEPS.indexOf(app.tour) + 1 : 0)
-  // Replaying with nothing to water: end on a friendlier note than a missing 💧.
+  // Replaying with nothing to water: end on a friendlier note than a missing water drop.
   const dry = $derived(app.tour === 'water' && !app.garden.some((p) => p && phaseOf(p, Date.now()) === 'thirsty'))
 
   let shown = $state(false)
@@ -120,7 +121,7 @@
     const frame = () => {
       raf = requestAnimationFrame(frame)
       const where = s.screen ?? 'garden'
-      const covered = !s.over && document.querySelector('.backdrop, .lvlup, .menu')
+      const covered = !s.over && document.querySelector('.backdrop, .lvlup')
       shown = where === screen && !covered && (where !== 'garden' || !!document.querySelector('.bed'))
       const el = shown ? s.target?.() : null
       if (!el) {
@@ -160,10 +161,11 @@
   {/if}
   {#key app.tour}
     <aside class="tour" class:top aria-live="polite" aria-label="Tutorial">
+      <span class="tour-mochi"><Mochi size={46} mood={n === 1 || dry ? 'glad' : 'happy'} /></span>
       <span class="tour-count">{n} / {TOUR_STEPS.length}</span>
       {#if dry}
         <h2>がんばって! You’re all set</h2>
-        <p>When a plant shows a 💧, tap it and answer 10 questions to water it. Good luck!</p>
+        <p>When a plant thinks of a water drop, tap it and answer 10 questions to water it. Good luck!</p>
       {:else}
         <h2>{step.title}</h2>
         <p>{typeof step.text === 'string' ? step.text : step.text()}</p>

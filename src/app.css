@@ -1,15 +1,27 @@
 :root {
-  --bg: #12131f;
-  --panel: #1c1e30;
-  --panel2: #262942;
-  --text: #eef0ff;
-  --dim: #8d92b8;
-  --accent: #7c5cff;
-  --good: #35d49a;
-  --bad: #ff5d73;
-  --gold: #ffc94d;
-  color-scheme: dark;
-  font-family: system-ui, -apple-system, 'Segoe UI', 'Hiragino Sans', 'Yu Gothic', sans-serif;
+  /* Honey harvest. Text colours (text, dim, gold, good, bad) are at least 4.5:1 on bg, panel and panel2. */
+  --bg: #fff3d6;
+  --panel: #fffbec;
+  --panel2: #fbeccb;
+  --line: #ecd9ae;
+  --text: #54402a;
+  --dim: #76603f;
+  --accent: #f6bc61;
+  --on-accent: #4a300c;
+  --good: #55722a;
+  --bad: #ad4f35;
+  --gold: #93600f;
+  --honey: #f9d37a;
+  --leaf: #c3d07c;
+  --deep: #75873f;
+  --sky: #cfe6dd;
+  --earth: #c08d55;
+  --blush: #f9c79d;
+  --shade: #94682c;
+  --spring: cubic-bezier(0.2, 1.7, 0.4, 1);
+  color-scheme: light;
+  font-family: 'Zen Maru Gothic', system-ui, -apple-system, 'Hiragino Maru Gothic ProN', 'Hiragino Sans', 'Yu Gothic', sans-serif;
+  font-weight: 500;
 }
 
 * { box-sizing: border-box; }
@@ -19,7 +31,7 @@ html { overflow-x: clip; }
 
 body {
   margin: 0;
-  background: radial-gradient(1200px 600px at 50% -10%, #26204d, var(--bg));
+  background: radial-gradient(1200px 600px at 50% -10%, #fffaea, var(--bg));
   color: var(--text);
   min-height: 100vh;
   overflow-x: clip;
@@ -29,7 +41,8 @@ body {
 main {
   max-width: 640px;
   margin: 0 auto;
-  padding: max(12px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+  /* The bottom clears the burrow dock. */
+  padding: max(12px, env(safe-area-inset-top)) 16px calc(96px + env(safe-area-inset-bottom));
 }
 
 h1 { font-size: 1.4rem; letter-spacing: 0.02em; }
@@ -38,59 +51,72 @@ h2, h3 { margin: 0.6em 0 0.4em; }
 button, select, input { font: inherit; color: inherit; }
 
 button {
-  background: var(--panel2);
-  border: 1px solid #343860;
-  border-radius: 12px;
+  background: var(--panel);
+  border: 2px solid transparent;
+  border-radius: 16px;
   padding: 10px 14px;
   cursor: pointer;
-  transition: transform 0.1s, background 0.15s, border-color 0.15s;
+  transition: transform 0.1s, background 0.15s, border-color 0.15s, box-shadow 0.1s;
 }
-button:hover:not(:disabled) { border-color: var(--accent); }
+button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
 button:active:not(:disabled) { transform: scale(0.96); }
 button:disabled { opacity: 0.85; cursor: default; }
 
-/* White text: inside dim containers (.empty) it would otherwise inherit grey and look disabled. */
-.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+/* Squishy pebble: squashes while held, wobbles once on letting go (squish.ts adds .boing).
+   The colour is set, not inherited: inside dim containers (.empty) it would otherwise look disabled. */
+.primary { border-color: transparent; border-radius: 44px 38px 36px 42px / 40px 44px 34px 38px; background: var(--accent); color: var(--on-accent); font-weight: 700; box-shadow: inset 0 -6px 8px #0000001c, 0 6px 0 color-mix(in srgb, var(--accent) 70%, var(--shade)); transition: transform 0.3s var(--spring), box-shadow 0.15s; }
+.primary:hover:not(:disabled) { border-color: transparent; }
+/* Sheets and the tutorial card are panel-coloured, so their plain buttons sit a shade deeper. :where keeps
+   this as weak as the base rule, so any button's own class still wins. */
+:where(.sheet, .tour) button:where(:not(.primary, .linkish)) { background: var(--panel2); }
+.primary:active:not(:disabled) { transform: translateY(5px) scale(1.04, 0.9); box-shadow: inset 0 -3px 6px #0000001c, 0 1px 0 color-mix(in srgb, var(--accent) 70%, var(--shade)); transition-duration: 0.1s; }
+.boing { animation: boing 0.55s var(--spring); }
+@keyframes boing { 0% { transform: scale(0.94, 1.08); } 35% { transform: scale(1.06, 0.94); } 65% { transform: scale(0.98, 1.02); } }
 .danger { border-color: var(--bad); color: var(--bad); }
 
-/* Header: title on the left, room on the right for the fixed menu button. */
-header { display: flex; align-items: center; min-height: 44px; padding-right: 56px; }
+header { display: flex; align-items: center; min-height: 44px; }
 header h1 { margin: 0; }
-.home { padding: 0; background: none; border: none; border-radius: 6px; letter-spacing: inherit; text-align: left; }
+.home { padding: 0; background: none; border: none; border-radius: 6px; box-shadow: none; font-weight: 700; letter-spacing: inherit; text-align: left; }
 
-/* Menu: the button floats top right above everything; the panel slides in from the right edge. */
-.burger { position: fixed; z-index: 31; top: max(12px, env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right)); display: grid; place-content: center; gap: 5px; width: 44px; height: 44px; padding: 0; box-shadow: 0 4px 14px #0006; }
-.burger span { display: block; width: 20px; height: 2px; border-radius: 2px; background: var(--text); transition: transform 0.25s, opacity 0.2s; }
-.burger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
-.burger.open span:nth-child(2) { opacity: 0; }
-.burger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
-.scrim { position: fixed; inset: 0; z-index: 29; background: #0008; }
-.menu { position: fixed; z-index: 30; top: 0; right: 0; bottom: 0; display: flex; flex-direction: column; gap: 8px; width: min(280px, 82vw); padding: calc(max(12px, env(safe-area-inset-top)) + 60px) 16px max(24px, env(safe-area-inset-bottom)); overflow-y: auto; background: var(--panel); border-left: 1px solid #343860; box-shadow: -20px 0 40px -10px #000a; }
-.menu button { padding: 14px 16px; font-size: 1.05rem; text-align: left; }
-.menu-action { color: var(--dim); font-size: 0.95rem !important; }
-.menu-action.first { margin-top: 12px; }
-.menu button[aria-current='page'] { background: var(--accent); border-color: var(--accent); font-weight: 600; }
-@media (prefers-reduced-motion: reduce) { .burger span { transition: none; } }
+/* Burrow dock (Menu.svelte): the main screens along the bottom, Mochi peeking from the current one.
+   Under sheets (10) and the tutorial, over the garden. */
+.dock { position: fixed; z-index: 9; left: 50%; bottom: max(10px, env(safe-area-inset-bottom)); translate: -50% 0; display: flex; justify-content: space-around; gap: 2px; width: min(480px, calc(100vw - 20px)); padding: 8px 6px 6px; border-radius: 26px; background: var(--panel); box-shadow: 0 8px 18px -8px var(--shade); outline: 2.5px dashed var(--line); outline-offset: -6px; }
+.burrow { display: flex; flex: 1; flex-direction: column; align-items: center; gap: 3px; min-width: 0; padding: 0; background: none; border: none; box-shadow: none; color: var(--dim); }
+.burrow.on { color: var(--text); font-weight: 700; }
+.burrow small { font-size: 0.74rem; }
+.burrow-hole { position: relative; width: 46px; height: 32px; overflow: hidden; border-radius: 50% 50% 16px 16px / 90% 90% 16px 16px; background: color-mix(in srgb, var(--earth) 70%, #3f3128); }
+.burrow-peek { position: absolute; left: 6px; bottom: -8px; animation: peek 0.45s var(--spring); }
+.burrow-dots { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 4px; }
+.burrow-dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--panel); }
+@keyframes peek { from { transform: translateY(26px); } }
+.more-sheet { display: flex; flex-direction: column; gap: 8px; }
+.more-sheet h2 { margin-top: 4px; }
+.more-sheet .big-btn { margin-top: 0; }
+.more-sheet [aria-current='page'] { background: var(--leaf); color: #2c3a2c; }
+@media (prefers-reduced-motion: reduce) { .burrow-peek { animation: none; } }
 
 .chapters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 10px 0 14px; }
 .chapters .lbl { color: var(--dim); font-size: 0.8rem; margin-right: 4px; }
 .chip { padding: 6px 11px; border-radius: 999px; font-size: 0.85rem; background: var(--panel); color: var(--dim); }
-.chip.on { background: var(--gold); border-color: var(--gold); color: #3a2a00; font-weight: 700; }
+.chip.on { background: var(--honey); border-color: var(--honey); color: #3a2a00; font-weight: 700; }
 .chip.n5 { margin-left: 8px; } /* N5 Prep sits apart from the Genki chapters */
 
 .hud { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
 .deck > .hud { margin-top: 12px; } /* clear of the menu button, with the chapter chips hidden */
 .lvl { font-weight: 700; color: var(--gold); min-width: 3.2em; }
-.xpbar { flex: 1; height: 10px; background: var(--panel); border-radius: 999px; overflow: hidden; }
-.xpbar div { height: 100%; background: linear-gradient(90deg, var(--accent), var(--gold)); border-radius: 999px; transition: width 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.2); }
+.xpbar { flex: 1; height: 10px; background: var(--panel2); border-radius: 999px; overflow: hidden; }
+.xpbar div { height: 100%; background: linear-gradient(90deg, var(--leaf), var(--deep)); border-radius: 999px; transition: width 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.2); }
 .combo { min-width: 4.5em; text-align: right; color: var(--dim); font-weight: 600; transition: transform 0.2s; }
 .combo.hot { color: var(--gold); transform: scale(1.15); }
 .combo.cold { opacity: 0.55; }
 
-.dots { flex: 1; display: flex; gap: 5px; }
-.dots i { flex: 1; height: 10px; border-radius: 999px; background: var(--panel); transition: background 0.2s; }
-.dots i.done { background: var(--good); }
-.dots i.now { background: var(--accent); }
+/* Seed row (GardenQuiz.svelte): a seed per question, sprouting once answered. */
+.seedrow { flex: 1; display: flex; min-width: 0; height: 34px; padding: 0 4px 3px; border-radius: 0 0 14px 14px; background: linear-gradient(180deg, transparent 0 21px, color-mix(in srgb, var(--earth) 70%, #3f3128) 21px); }
+.seed-slot { display: flex; flex: 1 1 0; align-items: flex-end; justify-content: center; min-width: 0; }
+.seed-slot i { width: 7px; height: 5px; margin-bottom: 5px; border-radius: 50%; background: var(--honey); }
+.seed-slot i.now { width: 9px; height: 7px; box-shadow: 0 0 0 2px #fff8; animation: breathe 1.4s ease-in-out infinite; }
+.seed-sprout { display: block; margin-bottom: 6px; transform-origin: 50% 100%; animation: grow-up 0.5s var(--spring); }
+@keyframes grow-up { from { transform: scale(0.2, 0); } }
 .quit { padding: 6px 12px; font-size: 0.85rem; color: var(--dim); }
 .summary h2 { color: var(--text); }
 .summary p { margin: 0.4em 0; }
@@ -111,11 +137,14 @@ header h1 { margin: 0; }
 .stage { position: relative; display: flex; justify-content: center; }
 
 .card {
+  /* Seed packet: a honey band across the top with a torn edge, and the seeds printed at the bottom. */
+  position: relative;
   width: 100%;
-  background: var(--panel);
-  border: 2px solid #343860;
-  border-radius: 24px;
-  padding: 22px 18px 24px;
+  background: linear-gradient(180deg, var(--honey) 0 52px, var(--panel) 52px);
+  border: 2px solid transparent;
+  border-radius: 10px 10px 26px 26px;
+  box-shadow: 0 10px 18px -12px var(--shade);
+  padding: 18px 18px 34px;
   text-align: center;
   min-height: 330px;
   display: flex;
@@ -125,9 +154,11 @@ header h1 { margin: 0; }
   gap: 14px;
   animation: pop-in 0.28s cubic-bezier(0.2, 1.2, 0.4, 1);
 }
-.card.right { border-color: var(--good); box-shadow: 0 0 40px -6px var(--good); }
-.card.shake { border-color: var(--bad); animation: shake 0.4s; }
-.tagline { color: var(--dim); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; }
+.card::before { content: ''; position: absolute; left: 0; right: 0; top: -7px; height: 8px; background: conic-gradient(from 135deg at 50% 0, var(--honey) 0 25%, transparent 0) 0 0 / 12px 8px; }
+.card::after { content: ''; position: absolute; left: 50%; bottom: 14px; width: 46%; height: 8px; translate: -50% 0; background: radial-gradient(ellipse 3px 4px, var(--earth) 90%, transparent) 0 0 / 15px 8px; opacity: 0.7; }
+.card.right { border-color: var(--leaf); box-shadow: 0 0 34px -8px var(--deep); }
+.card.shake { border-color: color-mix(in srgb, var(--bad) 55%, transparent); animation: shake 0.4s; }
+.tagline { margin-bottom: 10px; color: #5e4416; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
 .big { font-size: clamp(4rem, 22vw, 7.5rem); line-height: 1.1; font-weight: 500; }
 .big.mid { font-size: clamp(3rem, 16vw, 5.5rem); white-space: nowrap; }
 .big.long { font-size: clamp(1.7rem, 7vw, 2.8rem); line-height: 1.4; }
@@ -137,18 +168,25 @@ header h1 { margin: 0; }
 .answer { font-size: 2.2rem; font-weight: 700; color: var(--gold); animation: pop-in 0.25s; }
 
 .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; }
-.choice { font-size: 1.3rem; padding: 14px; }
+/* Squishy pebbles: each answer squashes under the thumb. The right one bounces twice; a wrong pick
+   sighs flat and slowly puffs back. */
+.choice { min-height: 68px; padding: 12px 8px; border-radius: 44px 38px 36px 42px / 40px 44px 34px 38px; background: var(--panel); font-size: 1.3rem; font-weight: 700; box-shadow: inset 0 -6px 8px #00000012, 0 5px 0 color-mix(in srgb, var(--panel) 55%, var(--shade)); transition: transform 0.3s var(--spring), box-shadow 0.15s, background 0.35s, opacity 0.3s; }
+.choice:nth-child(even) { border-radius: 38px 46px 40px 36px / 44px 36px 42px 38px; }
+.choice:active:not(:disabled) { transform: translateY(4px) scale(1.06, 0.88); box-shadow: inset 0 -3px 6px #00000012, 0 1px 0 color-mix(in srgb, var(--panel) 55%, var(--shade)); transition-duration: 0.1s; }
 .choice[lang='ja'] { font-size: 1.05rem; line-break: strict; }
-.choice.ok { background: var(--good); border-color: var(--good); color: #062a1d; font-weight: 700; }
-.choice.no { background: var(--bad); border-color: var(--bad); color: #330610; }
+.choice:disabled { opacity: 0.55; }
+.choice.ok { background: var(--leaf); color: #2c3a2c; opacity: 1; animation: cheer 1s var(--spring); }
+.choice.no { background: color-mix(in srgb, var(--panel) 70%, var(--sky)); opacity: 1; animation: deflate 1.5s ease-out; }
+@keyframes cheer { 0% { transform: scale(1.12, 0.84); } 22% { transform: translateY(-11px) scale(0.93, 1.09); } 42% { transform: scale(1.08, 0.92); } 62% { transform: translateY(-5px) scale(0.97, 1.04); } 82% { transform: scale(1.02, 0.98); } }
+@keyframes deflate { 15% { transform: translateY(5px) scale(1.12, 0.74); } 45% { transform: translateY(4px) scale(1.1, 0.78); } }
 
 form { display: flex; gap: 8px; width: 100%; }
 input[type='text'], input:not([type]) {
   flex: 1;
   min-width: 0;
-  background: var(--bg);
-  border: 2px solid #343860;
-  border-radius: 12px;
+  background: var(--panel);
+  border: 2px solid var(--line);
+  border-radius: 16px;
   padding: 12px;
   font-size: 1.2rem;
   text-align: center;
@@ -188,7 +226,7 @@ input:focus { outline: none; border-color: var(--accent); }
 @keyframes rise { from { transform: translateY(10px); opacity: 0; } 20% { opacity: 1; } to { transform: translateY(-40px); opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .card, .answer, .burst i, .gain { animation: none !important; }
+  .card, .answer, .burst i, .gain, .choice, .boing, .seed-sprout, .seed-slot i.now { animation: none !important; }
   .burst, .gain { display: none; }
 }
 
@@ -199,14 +237,14 @@ input:focus { outline: none; border-color: var(--accent); }
 .tiles span, .dim { color: var(--dim); font-size: 0.8rem; }
 .lists { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 @media (max-width: 520px) { .lists { grid-template-columns: 1fr; } .tiles { grid-template-columns: 1fr 1fr; } }
-.line { display: flex; align-items: baseline; gap: 8px; padding: 6px 0; border-bottom: 1px solid #2a2d48; font-size: 0.9rem; }
+.line { display: flex; align-items: baseline; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 0.9rem; }
 .line .jp { font-size: 1.4rem; min-width: 2.2em; }
 .line em { flex: 1; font-style: normal; color: var(--dim); }
 .good { color: var(--good); }
 .bad { color: var(--bad); }
 .settings { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-.settings select { background: var(--panel2); border: 1px solid #343860; border-radius: 10px; padding: 8px; }
-.file { background: var(--panel2); border: 1px solid #343860; border-radius: 12px; padding: 10px 14px; cursor: pointer; }
+.settings select { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 8px; }
+.file { background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; cursor: pointer; }
 .file input { display: none; }
 
 /* garden */
@@ -233,12 +271,13 @@ input:focus { outline: none; border-color: var(--accent); }
 .plot:has(.hit:focus-visible) .ring { opacity: 1; stroke: var(--gold); stroke-width: 2.5; }
 .plot .glow { display: none; fill: url(#bed-glow); }
 .plot.ready .glow { display: inline; animation: glow 1.6s ease-in-out infinite; }
-.plot .badge { position: absolute; transform: translate(-50%, -50%); padding: 4px 5px; border-radius: 999px; background: #1c1e30e6; border: 1px solid #ffffff30; box-shadow: 0 2px 6px #0006; font-size: 0.8rem; line-height: 1; pointer-events: auto; cursor: pointer; z-index: 3; }
+.plot .badge { position: absolute; transform: translate(-50%, -50%); pointer-events: auto; cursor: pointer; z-index: 3; }
+/* Plant thoughts: a cloud with what the plant wants, and two dots trailing down to it. */
+.plot .thought { display: grid; place-items: center; width: 30px; height: 27px; border-radius: 50%; background: var(--panel); box-shadow: 0 3px 5px -2px #3a2a1499; }
+.plot .badge i { position: absolute; left: 4px; bottom: -5px; width: 7px; height: 7px; border-radius: 50%; background: var(--panel); }
+.plot .badge i + i { left: 0; bottom: -11px; width: 4px; height: 4px; }
+.plot.resting .badge { opacity: 0.9; animation: bob 4s ease-in-out infinite; }
 .plot.thirsty .badge { animation: bob 2s ease-in-out infinite; }
-.plot .zzz { position: absolute; width: 22px; height: 26px; transform: translate(-50%, -60%); pointer-events: auto; cursor: pointer; z-index: 3; }
-.plot .zzz i { position: absolute; left: 2px; bottom: 0; font: italic 800 0.8rem/1 system-ui, sans-serif; color: #e8eaff; text-shadow: 0 1px 3px #000a; opacity: 0; animation: zzz 3s ease-out infinite; }
-.plot .zzz i:nth-child(2) { animation-delay: 1s; }
-.plot .zzz i:nth-child(3) { animation-delay: 2s; }
 .sprite { display: block; width: 100%; height: 100%; overflow: visible; }
 .plant { transform-box: view-box; transform-origin: 50px 86px; animation: grow 0.6s cubic-bezier(0.2, 1.3, 0.4, 1) backwards, sway 5s ease-in-out infinite; }
 .plant.still { animation: none; }
@@ -248,6 +287,10 @@ input:focus { outline: none; border-color: var(--accent); }
 .wsplash .wdrop { position: absolute; left: 0; top: 0; width: 9px; height: 13px; margin: -8px 0 0 -4.5px; background: #5bb6ff; border-radius: 50% 50% 50% 50% / 62% 62% 38% 38%; box-shadow: inset -2px -2px 0 #2f86d6, 0 0 6px #9fd6ff99; opacity: 0; }
 .wsplash .wring { position: absolute; width: 34px; height: 12px; border: 2px solid #9fd6ff; border-radius: 50%; opacity: 0; }
 .gstatus { text-align: center; color: var(--dim); margin: 14px 0 0; }
+/* Mochi, the garden guide, with what to do next in a speech bubble. */
+.guide { display: flex; align-items: flex-end; gap: 10px; max-width: 480px; margin: 16px auto 0; }
+.guide .mochi { flex: none; }
+.guide .gstatus { position: relative; flex: 1; min-width: 0; margin: 0; padding: 9px 13px; border-radius: 20px 20px 20px 5px; background: var(--panel); color: var(--text); line-height: 1.4; text-align: left; box-shadow: 0 5px 10px -8px var(--shade); }
 
 /* The sunbeam on a growing plant (GrowBeam.svelte). The svg shares .bed .scene's box, so it's drawn in bed units. */
 .growbeam { position: absolute; inset: 0; pointer-events: none; }
@@ -262,10 +305,10 @@ input:focus { outline: none; border-color: var(--accent); }
 .gb-burst { position: absolute; left: -60px; top: -50px; width: 120px; height: 120px; }
 .gb-plant .weed-gain { left: 0; top: -36px; animation-delay: 0.1s; font-size: 1.1rem; }
 /* At the bottom of the bed, where it can't cover the plant or the coin counter whichever row grew. */
-.growbeam .discovery { position: absolute; left: 0; right: 0; bottom: 10px; width: fit-content; max-width: 100%; margin: 0 auto; padding: 4px 12px; border-radius: 999px; background: #1c1e30f0; font-size: 0.85rem; text-align: center; animation: pop-in 0.3s cubic-bezier(0.2, 1.4, 0.4, 1) backwards; }
+.growbeam .discovery { position: absolute; left: 0; right: 0; bottom: 10px; width: fit-content; max-width: 100%; margin: 0 auto; padding: 4px 12px; border-radius: 999px; background: #fffbecf0; font-size: 0.85rem; text-align: center; animation: pop-in 0.3s cubic-bezier(0.2, 1.4, 0.4, 1) backwards; }
 .plot.growing .art { filter: drop-shadow(0 0 6px #ffe9a0); }
 /* Starts as the beam fades. clamp keeps the widest pair of names on the bed. */
-.gb-stage { position: absolute; left: clamp(142px, var(--x), calc(100% - 142px)); top: max(44px, var(--y)); translate: -50% -100%; padding: 4px 12px; border-radius: 999px; background: #1c1e30f0; box-shadow: 0 2px 8px #0008; color: #fff; font-size: 0.9rem; font-weight: 800; white-space: nowrap; opacity: 0; animation: gb-stage 2.1s 0.6s ease-out forwards; }
+.gb-stage { position: absolute; left: clamp(142px, var(--x), calc(100% - 142px)); top: max(44px, var(--y)); translate: -50% -100%; padding: 4px 12px; border-radius: 999px; background: #fffbecf0; box-shadow: 0 2px 8px #3a2a1466; color: var(--text); font-size: 0.9rem; font-weight: 800; white-space: nowrap; opacity: 0; animation: gb-stage 2.1s 0.6s ease-out forwards; }
 .gb-stage span { color: var(--dim); font-weight: 600; }
 @keyframes gb-stage { 0% { opacity: 0; transform: translateY(12px) scale(0.85); } 12% { opacity: 1; transform: none; } 75% { opacity: 1; transform: translateY(-12px); } 100% { opacity: 0; transform: translateY(-24px); } }
 @keyframes gb-light { 0% { opacity: 0; } 12%, 72% { opacity: 1; } 100% { opacity: 0; } }
@@ -278,17 +321,19 @@ input:focus { outline: none; border-color: var(--accent); }
 @keyframes gb-stage-still { 0%, 100% { opacity: 0; } 12%, 75% { opacity: 1; } }
 
 /* developer tools */
-.dev-btn { position: fixed; z-index: 9; left: 12px; bottom: max(12px, env(safe-area-inset-bottom)); display: grid; place-items: center; width: 40px; height: 40px; padding: 0; opacity: 0.75; box-shadow: 0 4px 14px #0006; }
+.dev-btn { position: fixed; z-index: 9; left: 12px; bottom: calc(92px + env(safe-area-inset-bottom)); display: grid; place-items: center; width: 40px; height: 40px; padding: 0; opacity: 0.75; box-shadow: 0 4px 14px #0006; }
 .sheet.dev { text-align: left; }
 .sheet.dev h3 { margin: 14px 0 6px; font-size: 0.95rem; }
 .sheet.dev .settings { gap: 8px; margin-bottom: 8px; }
-.sheet.dev input[type='number'] { width: 100px; padding: 8px; background: var(--panel2); color: inherit; border: 1px solid #343860; border-radius: 10px; font: inherit; }
+.sheet.dev input[type='number'] { width: 100px; padding: 8px; background: var(--panel); color: inherit; border: 1px solid var(--line); border-radius: 10px; font: inherit; }
 .sheet.dev select { max-width: 100%; }
 
-.backdrop { position: fixed; inset: 0; background: #000a; display: flex; align-items: flex-end; justify-content: center; z-index: 10; }
-.sheet { position: relative; width: 100%; max-width: 640px; max-height: 88vh; overflow-y: auto; background: var(--panel); border: 2px solid #343860; border-radius: 24px 24px 0 0; padding: 20px 18px max(20px, env(safe-area-inset-bottom)); text-align: center; animation: pop-in 0.2s; }
+.backdrop { position: fixed; inset: 0; background: #4a32145c; display: flex; align-items: flex-end; justify-content: center; z-index: 10; }
+/* Soft sheet: rises from below with a little bounce, puffy and stitched round the edge. */
+.sheet { position: relative; width: 100%; max-width: 640px; max-height: 88vh; overflow-y: auto; background: var(--panel); border: none; border-radius: 30px 30px 0 0; outline: 2.5px dashed var(--line); outline-offset: -9px; padding: 22px 20px max(22px, env(safe-area-inset-bottom)); box-shadow: 0 -10px 22px -14px var(--shade); text-align: center; animation: sheet-up 0.45s var(--spring); }
+@keyframes sheet-up { from { transform: translateY(60%); opacity: 0.6; } }
 /* z-index: the .hero below is positioned too and would otherwise sit over the button. 44px is a comfortable touch target. */
-.sheet .x { position: absolute; top: 8px; right: 8px; z-index: 1; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; }
+.sheet .x { position: absolute; top: 10px; right: 10px; z-index: 1; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border-radius: 50%; }
 .sheet p { margin: 0.3em 0; }
 .sheet .hero .sprite { width: 150px; height: 150px; margin: 0 auto; }
 .sheet .variant { margin: -0.3em 0 0.4em; color: var(--gold); font-weight: 600; }
@@ -304,18 +349,8 @@ input:focus { outline: none; border-color: var(--accent); }
 @keyframes grow { from { transform: scale(0.4); opacity: 0; } }
 @keyframes sway { 0%, 100% { transform: rotate(-1.6deg); } 50% { transform: rotate(1.6deg); } }
 @keyframes glow { 50% { opacity: 0.45; } }
-@keyframes zzz {
-  0% { transform: translate(0, 0) scale(0.6) rotate(-10deg); opacity: 0; }
-  20% { opacity: 0.95; }
-  100% { transform: translate(12px, -22px) scale(1.15) rotate(8deg); opacity: 0; }
-}
 @keyframes bob { 50% { transform: translate(-50%, -62%); } }
-@media (prefers-reduced-motion: reduce) { .plot .glow, .plot .badge, .plot .zzz i, .sheet, .plant { animation: none !important; }
-  /* Without motion, show the Zs as a still, rising trail. */
-  .plot .zzz i { opacity: 0.85; }
-  .plot .zzz i:nth-child(2) { transform: translate(6px, -9px) scale(0.85); }
-  .plot .zzz i:nth-child(3) { transform: translate(12px, -18px) scale(0.7); }
-}
+@media (prefers-reduced-motion: reduce) { .plot .glow, .plot .badge, .sheet, .plant { animation: none !important; } }
 
 /* celebration effects */
 .fxwrap { position: relative; }
@@ -444,7 +479,7 @@ input:focus { outline: none; border-color: var(--accent); }
 .cprog b { font-size: 1.3rem; color: var(--gold); }
 .cprog span { margin-left: 6px; font-size: 0.85rem; }
 .cbar { flex: none; margin-bottom: 14px; }
-.cbanner { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; justify-content: center; margin-bottom: 14px; padding: 12px; border: 1px solid var(--gold); border-radius: 16px; background: #ffc94d1a; text-align: center; animation: pop-in 0.4s; }
+.cbanner { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; justify-content: center; margin-bottom: 14px; padding: 12px; border: 2px solid var(--honey); border-radius: 16px; background: color-mix(in srgb, var(--honey) 22%, transparent); text-align: center; animation: pop-in 0.4s; }
 .cbanner b { width: 100%; font-size: 1.05rem; }
 .cbanner span:not(.coins) { color: var(--good); font-weight: 600; }
 .cgroup h3 { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; font-size: 1rem; }
@@ -458,14 +493,14 @@ input:focus { outline: none; border-color: var(--accent); }
 .flower-head { display: block; width: 80%; height: 80%; overflow: visible; }
 .fcard.pressed .paper { background: radial-gradient(circle at 30% 25%, #fbf5e6, #efe3c6); box-shadow: inset 0 0 0 1px #d8c79f, 0 3px 8px #0006; transform: rotate(var(--tilt)); }
 .fcard.pressed .flower-head { filter: saturate(0.8) sepia(0.18) drop-shadow(0 1px 0.5px #6a552c66); }
-.fcard.bloomed .paper { border: 2px dashed #4a4f7a; background: #22263f; }
+.fcard.bloomed .paper { border: 2px dashed var(--line); background: var(--panel2); }
 .fcard.hidden { color: var(--dim); }
-.fcard.hidden .paper { background: #171927; }
+.fcard.hidden .paper { background: #f3e4c2; }
 .fcard.hidden .flower-head { filter: brightness(0); opacity: 0.3; }
 .fcard.seen .paper { background: radial-gradient(circle at 50% 40%, #8fd17a, #5aa851); }
 .creature-art { display: block; width: 84%; height: 84%; overflow: visible; }
 .fcard.hidden .creature-art { filter: brightness(0); opacity: 0.3; }
-.fcard .stamp { position: absolute; top: 2px; right: 2px; padding: 2px 6px; border-radius: 999px; background: var(--good); color: #062a1d; font-size: 0.7rem; font-weight: 800; }
+.fcard .stamp { position: absolute; top: 2px; right: 2px; padding: 2px 6px; border-radius: 999px; background: var(--leaf); color: #2c3a2c; font-size: 0.7rem; font-weight: 800; }
 /* A freshly preserved flower drops onto its page, dries from full colour, and gets its stamp. */
 .fcard.arrive { box-shadow: 0 0 0 2px var(--gold), 0 0 26px -4px var(--gold); }
 .fcard.arrive .paper { animation: press-in 0.8s cubic-bezier(0.2, 1.2, 0.4, 1) both; }
@@ -492,7 +527,7 @@ input:focus { outline: none; border-color: var(--accent); }
    The pieces are flat siblings so the leaf can swing over the flower. Book parts move with `translate`
    so the leaf's `transform` stays free. WebKit ignored backface-visibility here, so the leaf's faces
    swap by a timed step instead, as it passes edge-on. */
-.pf { position: fixed; inset: 0; z-index: 35; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; overflow: hidden; background: radial-gradient(circle at 50% 42%, #2c3560, #0b0d1e 72%); cursor: pointer; }
+.pf { color: #fff3d6; position: fixed; inset: 0; z-index: 35; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; overflow: hidden; background: radial-gradient(circle at 50% 42%, #7a5530, #2e1d10 72%); cursor: pointer; }
 .pf-stage { position: relative; flex: none; width: 300px; height: 390px; }
 .pf-stage.thump { animation: pf-thump 0.3s ease-out; }
 .pf-soil, .pf-cut { position: absolute; left: 40px; top: 0; width: 220px; height: 220px; }
@@ -544,7 +579,7 @@ input:focus { outline: none; border-color: var(--accent); }
 .coins[data-coin-target] { display: inline-block; }
 
 /* level up */
-.lvlup { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 16px; background: radial-gradient(circle at 50% 42%, #3a2a7af2, #07081af7 70%); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); animation: lvl-in 0.25s ease-out; overflow: hidden; }
+.lvlup { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 16px; background: radial-gradient(circle at 50% 42%, #fff8e2f2, #f2d692f7 70%); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); animation: lvl-in 0.25s ease-out; overflow: hidden; }
 .lvlup-card { width: 100%; max-width: 380px; text-align: center; }
 .lvlup-orb { position: relative; display: grid; place-items: center; height: 190px; }
 .lvlup-num { font-size: 7rem; font-weight: 800; line-height: 1; color: var(--gold); }
@@ -590,7 +625,7 @@ input:focus { outline: none; border-color: var(--accent); }
 .decor-spot:hover::before, .dragging .decor-spot::before { background: #000000a0; box-shadow: 0 0 0 1.5px #ffffff80; }
 .decor-spot.target::before { border: 2px solid var(--gold); background: #ffc94d44; box-shadow: 0 0 12px var(--gold); opacity: 1; }
 .decor-preview { position: absolute; inset: 0; opacity: 0.55; filter: drop-shadow(0 0 4px #ffd76a); }
-.decor-tag { position: absolute; left: 50%; top: -6px; translate: -50% -100%; padding: 3px 7px; border-radius: 999px; background: var(--gold); color: #3a2a00; font-size: 0.7rem; font-weight: 800; white-space: nowrap; pointer-events: none; z-index: 2; }
+.decor-tag { position: absolute; left: 50%; top: -6px; translate: -50% -100%; padding: 3px 7px; border-radius: 999px; background: var(--honey); color: #3a2a00; font-size: 0.7rem; font-weight: 800; white-space: nowrap; pointer-events: none; z-index: 2; }
 .decor-ghost { position: absolute; z-index: 3; width: 13%; aspect-ratio: 40 / 44; translate: -50% -60%; pointer-events: none; filter: drop-shadow(0 8px 6px #0007); transform: scale(1.12) rotate(-4deg); }
 .chime-swing { transform-box: view-box; transform-origin: 26.5px 8px; animation: chime 3.6s ease-in-out infinite; }
 .lantern-glow { animation: glow 2.8s ease-in-out infinite; }
@@ -621,21 +656,21 @@ input:focus { outline: none; border-color: var(--accent); }
 .shop-head h2 { margin: 0.4em 0; }
 .shop-head h2 .dim { font-size: 0.8rem; font-weight: 500; }
 .shop-head .coins { font-size: 1.2rem; }
-.shop-note { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 10px 0; padding: 10px 12px; border: 1px solid var(--good); border-radius: 14px; background: #35d49a1a; color: var(--good); font-weight: 600; animation: pop-in 0.3s; }
+.shop-note { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 10px 0; padding: 10px 12px; border: 1px solid var(--good); border-radius: 14px; background: color-mix(in srgb, var(--leaf) 22%, transparent); color: var(--good); font-weight: 600; animation: pop-in 0.3s; }
 .shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 12px; }
-.shop-item { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 10px; border: 1px solid #343860; border-radius: 16px; background: var(--panel); text-align: center; }
+.shop-item { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 10px; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); text-align: center; }
 .shop-item.just { border-color: var(--good); }
-.shop-art { display: grid; place-items: center; width: 100%; height: 96px; border-radius: 12px; background: radial-gradient(ellipse at 50% 85%, #4f9a3a 0 34%, #2c5a26 35% 36%, transparent 37%), #22263f; }
+.shop-art { display: grid; place-items: center; width: 100%; height: 96px; border-radius: 12px; background: radial-gradient(ellipse at 50% 85%, #8fbf5a 0 34%, #6f9c45 35% 36%, transparent 37%), var(--panel2); }
 .shop-art .decor-art { width: 76px; height: 84px; }
 .shop-ja { font-size: 0.9rem; }
 .shop-item button { width: 100%; margin-top: 4px; }
 
 /* shop: tabs, upgrades and garden looks */
 .shop-tabs { display: flex; gap: 8px; margin-top: 12px; }
-.shop-tab { flex: 1; padding: 10px; border: 1px solid #343860; border-radius: 12px; background: var(--panel); color: var(--dim); font-weight: 700; }
+.shop-tab { flex: 1; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--dim); font-weight: 700; }
 .shop-tab.on { border-color: var(--gold); color: var(--gold); }
 .tier-stars { margin: 6px 0; color: var(--gold); }
-.tier-row { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100%; margin-top: 6px; padding-top: 8px; border-top: 1px solid #343860; }
+.tier-row { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100%; margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--line); }
 .tier-row .tier-stars { margin: 0; font-size: 0.85rem; }
 .tier-up { display: flex; align-items: center; justify-content: center; gap: 4px; }
 .tier-up .decor-art { flex: none; width: 24px; height: 26px; }
@@ -649,7 +684,7 @@ input:focus { outline: none; border-color: var(--accent); }
 .look-note { margin: 6px 0 0; text-align: center; font-size: 0.85rem; }
 .look-part h3 { margin: 16px 0 0; }
 .look-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 8px; }
-.look-card { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px; border: 1px solid #343860; border-radius: 16px; background: var(--panel); color: inherit; font: inherit; text-align: center; }
+.look-card { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); color: inherit; font: inherit; text-align: center; }
 .look-card.trying { border-color: var(--gold); }
 .look-card.worn { border-color: var(--good); }
 .look-swatch { display: grid; place-items: center; width: 100%; height: 48px; border-radius: 10px; font-size: 1.4rem; }
@@ -681,7 +716,7 @@ input:focus { outline: none; border-color: var(--accent); }
 .ring-tile b { color: var(--gold); font-size: 1.1rem; }
 .ring-tile span { color: var(--dim); font-size: 0.8rem; }
 .mring { width: 84px; height: 84px; overflow: visible; }
-.mring .track { fill: none; stroke: #2a2d48; stroke-width: 6; }
+.mring .track { fill: none; stroke: var(--line); stroke-width: 6; }
 .mring .fill { fill: none; stroke: var(--good); stroke-width: 6; stroke-linecap: round; transition: stroke-dasharray 0.6s; }
 .mring .leaf { fill: #5aa84a; stroke: #2e6b26; stroke-width: 0.4; }
 .mring text { fill: var(--text); font-size: 11px; font-weight: 700; text-anchor: middle; }
@@ -689,29 +724,31 @@ input:focus { outline: none; border-color: var(--accent); }
 
 /* resting plot countdown */
 .plot .ptimer { position: absolute; left: 50%; translate: -50% 0; display: flex; align-items: center; gap: 3px; width: 70%; pointer-events: none; }
-.plot .pclock { flex: none; width: 12px; height: 12px; filter: drop-shadow(0 1px 1px #0008); }
-.plot .pbar { flex: 1; height: 6px; overflow: hidden; border-radius: 999px; background: #1c1e30d0; box-shadow: 0 0 0 1px #ffffff30, 0 1px 3px #0008; }
-.plot .pbar i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #5bb6ff, var(--good)); transition: width 0.6s; }
+.plot .pclock { flex: none; width: 12px; height: 12px; filter: drop-shadow(0 1px 1px #3a2a1466); }
+.plot .pbar { flex: 1; height: 6px; overflow: hidden; border-radius: 999px; background: #fffbecd8; box-shadow: 0 0 0 1px #3a2a1433, 0 1px 3px #3a2a1466; }
+.plot .pbar i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #8ccbe0, var(--deep)); transition: width 0.6s; }
 
 /* weed pre-screen */
 .weed-ask-art { width: 86px; height: 86px; margin: 4px auto 0; }
-.shop-note.pending { color: var(--gold); border-color: var(--gold); background: #ffc94d1a; }
+.shop-note.pending { color: var(--gold); border-color: var(--gold); background: color-mix(in srgb, var(--honey) 25%, transparent); }
 
 /* New-player tutorial (Tour.svelte): a card pinned to the top or bottom, and a spotlight on what to tap.
    Both sit over sheets (10) but under the menu (30) and level-up (40). Neither blocks taps. */
-.tour { position: fixed; z-index: 21; left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); translate: -50% 0; width: min(480px, calc(100vw - 32px)); padding: 14px 16px 8px; background: var(--panel); border: 2px solid var(--gold); border-radius: 18px; box-shadow: 0 12px 40px -8px #000c; animation: pop-in 0.2s; }
+/* Mochi leads it, from the card's top left. Above the dock at the bottom. */
+.tour { position: fixed; z-index: 21; left: 50%; bottom: calc(88px + env(safe-area-inset-bottom)); translate: -50% 0; width: min(480px, calc(100vw - 32px)); padding: 14px 16px 8px 70px; background: var(--panel); border: none; border-radius: 24px; outline: 2.5px dashed var(--line); outline-offset: -7px; box-shadow: 0 12px 32px -10px var(--shade); animation: pop-in 0.2s; }
+.tour-mochi { position: absolute; left: 12px; top: 12px; animation: mochi-hop 0.5s var(--spring); }
 .tour.top { bottom: auto; top: calc(max(12px, env(safe-area-inset-top)) + 56px); }
 .tour h2 { margin: 0 0 6px; padding-right: 3em; font-size: 1.05rem; color: var(--gold); }
 .tour p { margin: 0; line-height: 1.45; }
 .tour-count { position: absolute; top: 14px; right: 16px; color: var(--dim); font-size: 0.75rem; }
 .tour-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; }
-.tour-ring { position: fixed; z-index: 20; pointer-events: none; border: 3px solid var(--gold); border-radius: 16px; box-shadow: 0 0 0 200vmax #0008, 0 0 18px var(--gold); animation: tour-pulse 1.4s ease-in-out infinite; }
-.tour-tip { margin: 8px 0 4px !important; padding: 8px 12px; border-radius: 12px; background: #ffc94d22; color: var(--gold); }
-@keyframes tour-pulse { 50% { border-color: #fff; box-shadow: 0 0 0 200vmax #0008, 0 0 28px var(--gold); } }
-@media (prefers-reduced-motion: reduce) { .tour, .tour-ring { animation: none; } }
+.tour-ring { position: fixed; z-index: 20; pointer-events: none; border: 3px solid var(--honey); border-radius: 16px; box-shadow: 0 0 0 200vmax #3a2a1477, 0 0 18px var(--honey); animation: tour-pulse 1.4s ease-in-out infinite; }
+.tour-tip { margin: 8px 0 4px !important; padding: 8px 12px; border-radius: 12px; background: color-mix(in srgb, var(--honey) 30%, transparent); color: var(--gold); }
+@keyframes tour-pulse { 50% { border-color: #fff; box-shadow: 0 0 0 200vmax #3a2a1477, 0 0 28px var(--honey); } }
+@media (prefers-reduced-motion: reduce) { .tour, .tour-ring, .tour-mochi { animation: none; } }
 
 /* Quiz touches: the New label, the "I don't know" link, bigger callouts on a combo milestone. */
-.new-tag { display: inline-block; margin-left: 4px; padding: 1px 7px; border-radius: 999px; background: var(--gold); color: #3a2a00; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.04em; }
+.new-tag { display: inline-block; margin-left: 4px; padding: 1px 7px; border-radius: 999px; background: var(--panel); color: #3a2a00; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.04em; }
 .idk { margin: -4px 0 -8px; text-decoration: underline; text-underline-offset: 2px; }
 .verdict.big { font-size: 1.25rem; animation: pop-in 0.35s cubic-bezier(0.2, 1.6, 0.4, 1); }
 .verdict.unsure { color: var(--text); }
@@ -723,9 +760,14 @@ input:focus { outline: none; border-color: var(--accent); }
 /* Fixed, or the falling pieces would stretch the page and add a scrollbar. */
 .sum-confetti { position: fixed; inset: 0; z-index: 5; overflow: hidden; pointer-events: none; }
 .sum-title { font-size: 2rem; margin-bottom: 0; animation: lvl-pop 0.55s cubic-bezier(0.2, 1.6, 0.4, 1) both; }
-.sum-stars { font-size: 2rem; line-height: 1.2; color: var(--panel2); }
-.sum-stars span { display: inline-block; animation: lvl-pop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) both; }
-.sum-stars .on { color: var(--gold); text-shadow: 0 0 12px #ffd76a88; }
+/* Ripening branch: three fruits, one ripening for each star. */
+.sum-branch { position: relative; width: 210px; height: 92px; margin: 6px auto 0; }
+.sum-bough { position: absolute; left: 0; right: 0; top: 8px; height: 8px; border-radius: 6px; background: var(--earth); transform: rotate(-2deg); }
+.sum-fruit { position: absolute; left: calc(14% + var(--i) * 28%); top: 12px; display: flex; flex-direction: column; align-items: center; transform-origin: 50% 0; animation: sway 3s calc(1.6s + var(--i) * -0.6s) ease-in-out infinite; }
+.sum-fruit i { width: 3px; height: 14px; background: var(--earth); }
+.sum-fruit span { width: 30px; height: 30px; margin-top: -2px; border-radius: 46% 46% 50% 50% / 42% 42% 58% 58%; background: var(--leaf); box-shadow: inset -4px -5px 7px #0000001a; transform: scale(0.6); transform-origin: 50% 0; }
+.sum-fruit.on span { width: 50px; height: 52px; background: radial-gradient(circle at 34% 28%, #fff6 0 5px, transparent 6px), var(--accent); transform: none; animation: ripen 1s calc(0.25s + var(--i) * 0.35s) var(--spring) backwards; }
+@keyframes ripen { 0% { transform: scale(0.35); background: var(--leaf); } 55% { background: var(--leaf); } }
 .sum-cheer b { font-size: 1.2rem; color: var(--good); }
 .sum-xp { max-width: 320px; margin: 10px auto 12px; }
 .sum-xp-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
@@ -734,11 +776,11 @@ input:focus { outline: none; border-color: var(--accent); }
 .summary .sum-pop { animation: pop-in 0.4s var(--at) cubic-bezier(0.2, 1.5, 0.4, 1) backwards; }
 .sum-big { color: var(--gold); font-size: 1.15rem; font-weight: 800; }
 .sum-hook { color: var(--text); font-weight: 600; }
-.sum-mastered { display: flex; flex-direction: column; gap: 2px; max-width: 320px; margin: 8px auto; padding: 10px 14px; border: 2px solid var(--gold); border-radius: 16px; background: #ffc94d1a; color: var(--text); }
+.sum-mastered { display: flex; flex-direction: column; gap: 2px; max-width: 320px; margin: 8px auto; padding: 10px 14px; border: 2px solid var(--honey); border-radius: 16px; background: color-mix(in srgb, var(--honey) 22%, transparent); color: var(--text); }
 .sum-mastered b { color: var(--gold); font-size: 1.1rem; }
 .sum-tend { display: block; margin: 8px auto 0; font-size: 0.95rem; color: var(--good); }
 @media (prefers-reduced-motion: reduce) {
-  .sum-title, .sum-stars span, .summary .sum-pop, .verdict.big, .choice.guide { animation: none; }
+  .sum-title, .sum-fruit, .sum-fruit span, .summary .sum-pop, .verdict.big, .choice.guide { animation: none; }
   .sum-bar div { transition: none; }
 }
 
@@ -746,10 +788,23 @@ input:focus { outline: none; border-color: var(--accent); }
 .hud-btn { display: inline-flex; align-items: center; gap: 10px; min-height: 36px; padding: 2px 4px; background: none; border: none; border-radius: 10px; }
 .hud-btn.hud-level { flex: 1; min-width: 0; }
 .hud-btn .xpbar { display: block; }
-.xpfill { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--gold)); border-radius: 999px; transition: width 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.2); }
+.xpfill { display: block; height: 100%; background: linear-gradient(90deg, var(--leaf), var(--deep)); border-radius: 999px; transition: width 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.2); }
 .garden > .hud { margin-top: 10px; }
+/* Hanging sign (Garden.svelte): a wooden plank on two ropes that swings when one of its numbers is tapped. */
+.hud.sign { position: relative; margin-top: 26px; padding: 6px 8px; border-radius: 16px; background: repeating-linear-gradient(92deg, #d7a974 0 18px, #cf9f69 18px 34px); color: #4d3018; box-shadow: 0 5px 0 #a87a4a, 0 10px 12px -8px var(--shade); transform-origin: 50% -30px; }
+.hud.sign .rope { position: absolute; top: -22px; width: 4px; height: 24px; border-radius: 3px; background: var(--earth); }
+.hud.sign .rope.l { left: 20%; }
+.hud.sign .rope.r { right: 20%; }
+.hud.sign.swing { animation: swing 0.7s ease-in-out; }
+.hud.sign .hud-btn { color: inherit; }
+.hud.sign .lvl, .hud.sign .coins { color: #4d3018; font-weight: 800; }
+.hud.sign .streak { color: #3f5418; }
+.hud.sign .streak.pending { color: #6a4a26; }
+.hud.sign .xpbar { background: #4d301833; }
+@keyframes swing { 20% { transform: rotate(3deg); } 50% { transform: rotate(-2.2deg); } 78% { transform: rotate(1deg); } }
+@media (prefers-reduced-motion: reduce) { .hud.sign.swing { animation: none; } }
 .hud-sheet ul { margin: 12px auto 0; padding: 0; max-width: 420px; list-style: none; text-align: left; }
-.hud-sheet li { padding: 7px 0; border-top: 1px solid #343860; }
+.hud-sheet li { padding: 7px 0; border-top: 1px solid var(--line); }
 .hud-big { color: var(--gold); font-weight: 700; }
 .hud-earn li { display: flex; justify-content: space-between; gap: 12px; }
 .hud-earn b { color: var(--gold); white-space: nowrap; }
@@ -780,3 +835,45 @@ input:focus { outline: none; border-color: var(--accent); }
 .tod.night { background: radial-gradient(ellipse at 50% 45%, #0b144055, #0b1440a0); }
 .festival { overflow: hidden; }
 .sky.sparse { background: none; }
+
+/* Mochi the seed (Mochi.svelte): the guide, and the only thing in the UI with a face. */
+.mochi { position: relative; display: inline-block; width: var(--m); height: var(--m); transform-origin: 50% 100%; animation: breathe 3.4s ease-in-out infinite; }
+.mochi i { display: block; font-style: normal; }
+.mochi-body { position: absolute; inset: 14% 0 0; display: grid; place-items: center; border-radius: 52% 52% 46% 46% / 58% 58% 42% 42%; background: radial-gradient(circle at 36% 30%, #fff8ea, var(--honey)); box-shadow: inset 0 -5px 8px #c99a3f33, 0 3px 5px -2px var(--shade); }
+.mochi-leaf { position: absolute; top: 2%; left: 50%; width: 30%; height: 20%; background: var(--leaf); border: 1.5px solid var(--deep); }
+.mochi-leaf.l { margin-left: -28%; border-radius: 90% 0; transform: rotate(14deg); }
+.mochi-leaf.r { margin-left: -2%; border-radius: 0 90%; transform: rotate(-14deg); }
+.face { position: relative; display: inline-block; width: calc(38px * var(--s)); height: calc(24px * var(--s)); }
+.face .eye { position: absolute; top: 0; width: calc(10px * var(--s)); height: calc(11px * var(--s)); overflow: hidden; border-radius: 50%; background: #3f3128; animation: blink 5s var(--blink) infinite; }
+.face .eye:nth-child(1) { left: calc(3px * var(--s)); }
+.face .eye:nth-child(2) { right: calc(3px * var(--s)); }
+.face .eye i { position: absolute; left: 22%; top: 16%; width: 42%; height: 42%; border-radius: 50%; background: #fff; }
+.face .cheek { position: absolute; top: calc(10px * var(--s)); width: calc(8px * var(--s)); height: calc(5px * var(--s)); border-radius: 50%; background: #f59a9a; opacity: 0.65; }
+.face .cheek.l { left: calc(-3px * var(--s)); }
+.face .cheek.r { right: calc(-3px * var(--s)); }
+.face .mouth { position: absolute; left: 50%; top: calc(10px * var(--s)); width: calc(8px * var(--s)); height: calc(5px * var(--s)); margin-left: calc(-4px * var(--s)); border: calc(1.6px * var(--s)) solid #3f3128; border-top: none; border-radius: 0 0 999px 999px; }
+.face.wow .mouth, .face.glad .mouth { height: calc(7px * var(--s)); background: #c2564f; }
+.face.wow .mouth { width: calc(6px * var(--s)); margin-left: calc(-3px * var(--s)); border-radius: 50%; border-top: calc(1.6px * var(--s)) solid #3f3128; }
+.face.shy .mouth { width: calc(5px * var(--s)); margin-left: calc(-2.5px * var(--s)); }
+.face.sleepy .eye, .face.glad .eye { background: none; animation: none; }
+.face.sleepy .eye { top: calc(4px * var(--s)); height: calc(4px * var(--s)); border-bottom: calc(2px * var(--s)) solid #3f3128; border-radius: 0 0 999px 999px; }
+.face.glad .eye { top: calc(2px * var(--s)); height: calc(6px * var(--s)); border-top: calc(2px * var(--s)) solid #3f3128; border-radius: 999px 999px 0 0; }
+.face.sleepy .eye i, .face.glad .eye i { display: none; }
+@keyframes blink { 0%, 93%, 100% { transform: scaleY(1); } 96% { transform: scaleY(0.1); } }
+@keyframes breathe { 50% { transform: scale(1.04, 0.96); } }
+@keyframes mochi-hop { 0% { transform: scale(1.15, 0.8); } 40% { transform: translateY(-12px) scale(0.92, 1.1); } 70% { transform: scale(1.08, 0.92); } }
+
+/* Dancing sprout (QuizCard.svelte): Mochi wiggles for a right answer and droops a little for a miss. */
+.row .react { display: block; flex: none; transform-origin: 50% 100%; }
+.row .react.right { animation: dance 0.9s ease-in-out; }
+.row .react.wrong { animation: droop 1.4s ease-in-out; }
+@keyframes dance { 20% { transform: rotate(-12deg) translateY(-4px); } 45% { transform: rotate(11deg); } 70% { transform: rotate(-8deg) translateY(-3px); } }
+@keyframes droop { 35%, 70% { transform: scale(1.05, 0.88) rotate(5deg); } }
+
+/* Stitched surfaces: panels have a sewn edge. */
+.tiles div, .ring-tile, .shop-item, .look-card, .fcard, .welcome li { box-shadow: 0 6px 12px -10px var(--shade); outline: 2px dashed var(--line); outline-offset: -5px; }
+.fcard.pressed .paper, .fcard.arrive { outline: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mochi, .face .eye, .row .react { animation: none !important; }
+}

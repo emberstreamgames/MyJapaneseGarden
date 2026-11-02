@@ -11,6 +11,7 @@
   import GroomSnip from './GroomSnip.svelte'
   import GrowBeam from './GrowBeam.svelte'
   import HudSheet from './HudSheet.svelte'
+  import Mochi from './Mochi.svelte'
   import { BLOOMED, STARTER, WEED_BONUS_XP, WEED_COINS, WELCOME_AFTER_MS, completionBonus, formatWait, msUntilReady, phaseOf, type Species, type Weed } from './garden'
   import { WEED_SPOTS, scene, weedBox } from './meadow'
   import PlotSheet from './PlotSheet.svelte'
@@ -97,6 +98,18 @@
   const festival = $derived(seasonPreview.festival === 'none' ? null : seasonPreview.festival || festivalOn(date.getMonth() + 1, date.getDate()))
   const worn = $derived(app.look.wearing.sky)
 
+  // The sign swings whenever one of its numbers is tapped. Only the class changes, so the tap's
+  // click still lands on the button.
+  function openHud(kind: 'level' | 'streak' | 'coins', e: MouseEvent) {
+    const sign = (e.currentTarget as Element).closest('.sign')
+    sign?.classList.remove('swing')
+    void (sign as HTMLElement | null)?.offsetWidth
+    sign?.classList.add('swing')
+    hud = kind
+  }
+
+  const guideMood = $derived(ready ? 'wow' : !thirsty && !app.weeds.length && nextWait !== null ? 'sleepy' : 'happy')
+
   function summarize(sprouted: number): Away {
     const phases = app.garden.flatMap((p) => (p ? [phaseOf(p, now)] : []))
     return {
@@ -150,7 +163,7 @@
 
   function closeSheet() {
     selected = null
-    // Closed without taking the quiz: the tutorial points back at the 💧.
+    // Closed without taking the quiz: the tutorial points back at the water drop.
     if (app.tour === 'quiz') setTour('water')
   }
 
@@ -247,15 +260,17 @@
   <GardenQuiz deck={q.deck} mode={q.mode} plot={q.mode === 'weed' ? null : app.garden[q.target]} bonus={q.bonus} weeds={q.spots.length || 1} onComplete={(right) => complete(q.target, q.mode, right)} onClose={closeQuiz} {onTend} />
 {:else}
   <section class="garden">
-    <div class="hud">
-      <button class="hud-btn hud-level" aria-label="Level {level()}, see your progress" onclick={() => (hud = 'level')}>
+    <!-- A wooden sign hanging on two ropes. -->
+    <div class="hud sign">
+      <i class="rope l"></i><i class="rope r"></i>
+      <button class="hud-btn hud-level" aria-label="Level {level()}, see your progress" onclick={(e) => openHud('level', e)}>
         <span class="lvl">Lv {level()}</span>
         <span class="xpbar"><span class="xpfill" style="width:{pct}%"></span></span>
       </button>
       {#if streak}
-        <button class="hud-btn streak" class:pending={!studiedToday} aria-label="{streak}-day streak, see details" onclick={() => (hud = 'streak')}>🌱 {streak}</button>
+        <button class="hud-btn streak" class:pending={!studiedToday} aria-label="{streak}-day streak, see details" onclick={(e) => openHud('streak', e)}>🌱 {streak}</button>
       {/if}
-      <button class="hud-btn" aria-label="{app.coins} coins, see how to earn more" onclick={() => (hud = 'coins')}><span class="coins" data-coin-target>🪙 {app.coins - inFlight.coins}</span></button>
+      <button class="hud-btn" aria-label="{app.coins} coins, see how to earn more" onclick={(e) => openHud('coins', e)}><span class="coins" data-coin-target>🪙 {app.coins - inFlight.coins}</span></button>
     </div>
 
     <div class="bed">
@@ -303,23 +318,29 @@
       {/if}
     </div>
 
-    <p class="gstatus">
-      {#if !planted}
-        Tap a plot to plant your first seed.
-      {:else if ready}
-        {ready === 1 ? 'A plant is' : `${ready} plants are`} ready to grow. Tap the ✨.
-      {:else if thirsty && studiedToday}
-        One plant is enough today. The {thirsty === 1 ? 'other one' : `other ${thirsty}`} can wait if you'd like a rest.
-      {:else if thirsty}
-        {thirsty === 1 ? 'A plant would' : `${thirsty} plants would`} love some care. Just one is enough for today.
-      {:else if app.weeds.length}
-        {app.weeds.length === 1 ? 'A weed is' : `${app.weeds.length} weeds are`} creeping in. Tap to pull for coins.
-      {:else if unplaced}
-        You have decorations to place. Tap a <b>+</b> on the lawn.
-      {:else if nextWait !== null}
-        All resting. Next ready in {formatWait(nextWait)}.
-      {/if}
-    </p>
+    {#if !planted || ready || thirsty || app.weeds.length || unplaced || nextWait !== null}
+      <!-- Mochi, the garden's guide, says what to do next. -->
+      <div class="guide">
+        <Mochi size={44} mood={guideMood} />
+        <p class="gstatus">
+          {#if !planted}
+            Tap a plot to plant your first seed.
+          {:else if ready}
+            {ready === 1 ? 'A plant is' : `${ready} plants are`} ready to grow. Tap the star.
+          {:else if thirsty && studiedToday}
+            One plant is enough today. The {thirsty === 1 ? 'other one' : `other ${thirsty}`} can wait if you'd like a rest.
+          {:else if thirsty}
+            {thirsty === 1 ? 'A plant would' : `${thirsty} plants would`} love some care. Just one is enough for today.
+          {:else if app.weeds.length}
+            {app.weeds.length === 1 ? 'A weed is' : `${app.weeds.length} weeds are`} creeping in. Tap to pull for coins.
+          {:else if unplaced}
+            You have decorations to place. Tap a <b>+</b> on the lawn.
+          {:else if nextWait !== null}
+            All resting. Next ready in {formatWait(nextWait)}.
+          {/if}
+        </p>
+      </div>
+    {/if}
     {#if words}<p class="gread">📖 You can read {words} {words === 1 ? 'word' : 'words'}</p>{/if}
     {#if weak}<button class="gtend" onclick={onTend}>🌿 {weak === 1 ? '1 shaky word' : `${weak} shaky words`} could use a quick tend</button>{/if}
     <p class="gseason">

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { DECK_LABEL, DECK_PROMPT, SIDE_LABEL } from '../data/items'
   import { HINT_COST } from './garden'
+  import Mochi from './Mochi.svelte'
   import { CHEERS, NEAR_MISS, type Quiz } from './quiz.svelte'
   import { app } from './store.svelte'
 
@@ -121,6 +122,8 @@
 
     {#if quiz.result}
       <div class="row">
+        <!-- Mochi dances for a right answer and droops a little for a miss. -->
+        <span class="react {quiz.result}" aria-hidden="true"><Mochi size={46} mood={quiz.result === 'right' ? 'glad' : quiz.unsure ? 'happy' : 'shy'} /></span>
         {#if quiz.result === 'right'}
           <div class="verdict right" class:big={quiz.praise.big || quiz.justMastered}>
             {#if quiz.justMastered}🌸 Mastered!{:else}{quiz.praise.en} {#if quiz.praise.ja}<span lang="ja">{quiz.praise.ja}</span>{/if}{/if}

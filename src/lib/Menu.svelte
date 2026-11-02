@@ -1,68 +1,71 @@
 <script lang="ts" generics="T extends string">
-  import { fade, fly } from 'svelte/transition'
+  import Mochi from './Mochi.svelte'
 
-  // `actions` sit under the screens, apart from them: they do something instead of switching screen.
+  // The burrow dock: the main screens along the bottom, with Mochi peeking from the one you're on.
+  // Screens without a `dock` label, and `actions` (which do something instead of switching screen),
+  // are in the More sheet.
   let {
     items,
     current,
     onselect,
     actions = [],
-  }: { items: { id: T; label: string }[]; current: T; onselect: (id: T) => void; actions?: { label: string; run: () => void }[] } = $props()
+  }: { items: { id: T; label: string; dock?: string }[]; current: T; onselect: (id: T) => void; actions?: { label: string; run: () => void }[] } = $props()
 
-  let open = $state(false)
-  let toggle: HTMLButtonElement
-  let panel = $state<HTMLElement>()
-  // Skip the slide when the system asks for less motion.
-  const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
-  const ms = (n: number) => (still ? 0 : n)
+  let more = $state(false)
+  let moreBtn: HTMLButtonElement
+  const docked = $derived(items.filter((it) => it.dock))
+  const rest = $derived(items.filter((it) => !it.dock))
+  const inMore = $derived(rest.some((it) => it.id === current))
 
   function choose(id: T) {
     onselect(id)
-    open = false
+    more = false
   }
 
   function act(run: () => void) {
     run()
-    open = false
+    more = false
   }
 
-  // Put keyboard focus on the current screen when the menu opens.
-  $effect(() => {
-    if (open) panel?.querySelector<HTMLButtonElement>('[aria-current="page"]')?.focus()
-  })
+  function close() {
+    more = false
+    moreBtn.focus()
+  }
 
   function onKey(e: KeyboardEvent) {
-    if (open && e.key === 'Escape') {
-      open = false
-      toggle.focus()
-    }
+    if (more && e.key === 'Escape') close()
   }
 </script>
 
 <svelte:window onkeydown={onKey} />
 
-<button bind:this={toggle} class="burger" class:open aria-label="Menu" aria-expanded={open} aria-controls="menu" onclick={() => (open = !open)}>
-  <span></span><span></span><span></span>
-</button>
+<nav class="dock" aria-label="Screens">
+  {#each docked as it (it.id)}
+    <button class="burrow" class:on={it.id === current} aria-current={it.id === current ? 'page' : undefined} onclick={() => choose(it.id)}>
+      <span class="burrow-hole">{#if it.id === current}<span class="burrow-peek"><Mochi size={34} /></span>{/if}</span>
+      <small>{it.dock}</small>
+    </button>
+  {/each}
+  <button bind:this={moreBtn} class="burrow" class:on={inMore} aria-haspopup="dialog" aria-expanded={more} onclick={() => (more = true)}>
+    <span class="burrow-hole">
+      {#if inMore}<span class="burrow-peek"><Mochi size={34} /></span>{:else}<span class="burrow-dots" aria-hidden="true"><i></i><i></i><i></i></span>{/if}
+    </span>
+    <small>More</small>
+  </button>
+</nav>
 
-{#if open}
+{#if more}
   <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-  <div class="scrim" transition:fade={{ duration: ms(200) }} onclick={() => (open = false)}></div>
-  <nav id="menu" class="menu" aria-label="Screens" bind:this={panel} transition:fly={{ x: 320, opacity: 1, duration: ms(260) }}>
-    {#each items as it, i (it.id)}
-      <!-- global: play as the panel opens, not only when the list itself changes -->
-      <button
-        aria-current={it.id === current ? 'page' : undefined}
-        onclick={() => choose(it.id)}
-        in:fly|global={{ x: 48, delay: ms(80 + i * 35), duration: ms(240) }}
-      >
-        {it.label}
-      </button>
-    {/each}
-    {#each actions as a, i (a.label)}
-      <button class="menu-action" class:first={i === 0} onclick={() => act(a.run)} in:fly|global={{ x: 48, delay: ms(80 + (items.length + i) * 35), duration: ms(240) }}>
-        {a.label}
-      </button>
-    {/each}
-  </nav>
+  <div class="backdrop" onclick={(e) => e.target === e.currentTarget && close()}>
+    <div class="sheet more-sheet" role="dialog" aria-modal="true" aria-label="More">
+      <button class="x" aria-label="Close" onclick={close}>✕</button>
+      <h2>More</h2>
+      {#each rest as it (it.id)}
+        <button class="big-btn" aria-current={it.id === current ? 'page' : undefined} onclick={() => choose(it.id)}>{it.label}</button>
+      {/each}
+      {#each actions as a (a.label)}
+        <button class="big-btn" onclick={() => act(a.run)}>{a.label}</button>
+      {/each}
+    </div>
+  </div>
 {/if}
