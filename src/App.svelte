@@ -16,18 +16,19 @@
   import { app, chapterSheet, level, levelHold, quizState, setTour, tourDid, type Preserved } from './lib/store.svelte'
 
   type Tab = 'garden' | 'shop' | 'collection' | 'tend' | 'hiragana' | 'katakana' | 'kanji' | 'vocab' | 'grammar' | 'stats'
-  // `hidden` leaves a screen out of the menu. The free practice decks are off for now.
-  const tabs: { id: Tab; label: string; hidden?: boolean }[] = [
-    { id: 'garden', label: 'Garden' },
-    { id: 'shop', label: 'Garden Shop' },
-    { id: 'collection', label: 'Collection' },
+  // `hidden` leaves a screen out of the menu, and `dock` puts it on the dock rather than under More.
+  // The free practice decks are off for now.
+  const tabs: { id: Tab; label: string; dock?: string; hidden?: boolean }[] = [
+    { id: 'garden', label: 'Garden', dock: 'Garden' },
+    { id: 'shop', label: 'Garden Shop', dock: 'Shop' },
+    { id: 'collection', label: 'Collection', dock: 'Collection' },
     { id: 'tend', label: 'Tend weak words' },
     { id: 'hiragana', label: 'ひらがな', hidden: true },
     { id: 'katakana', label: 'カタカナ', hidden: true },
     { id: 'kanji', label: '漢字', hidden: true },
     { id: 'vocab', label: 'Vocab', hidden: true },
     { id: 'grammar', label: 'Grammar', hidden: true },
-    { id: 'stats', label: 'Stats' },
+    { id: 'stats', label: 'Stats', dock: 'Stats' },
   ]
   let tab = $state<Tab>('garden')
   let fresh = $state<Preserved | null>(null) // a flower just preserved, shown off on the Collection page

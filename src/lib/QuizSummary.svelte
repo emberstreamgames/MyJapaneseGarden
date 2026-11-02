@@ -105,7 +105,7 @@
     fall: 30 + Math.random() * 40,
     rot: Math.random() * 1400 - 700,
     size: 6 + Math.random() * 5,
-    color: ['#ffc94d', '#ff9ec0', '#7c5cff', '#35d49a', '#5bb6ff'][i % 5],
+    color: ['#f9d37a', '#f9c79d', '#c3d07c', '#f6bc61', '#cfe6dd'][i % 5],
     delay: Math.random() * 0.2,
     dur: 1.8 + Math.random(),
   }))
@@ -158,8 +158,10 @@
   {/if}
 
   <h2 class="sum-title">{mode === 'tend' ? 'Nicely tended!' : mode === 'groom' ? 'Groomed!' : 'Watered!'}</h2>
-  <div class="sum-stars" role="img" aria-label="{stars} of 3 stars">
-    {#each [0, 1, 2] as i}<span class:on={i < stars} style="animation-delay:{0.2 + i * 0.15}s">★</span>{/each}
+  <!-- The score as a branch of three fruits: one ripens for each star. -->
+  <div class="sum-branch" role="img" aria-label="{stars} of 3 stars">
+    <i class="sum-bough"></i>
+    {#each [0, 1, 2] as i}<span class="sum-fruit" class:on={i < stars} style="--i:{i}"><i></i><span></span></span>{/each}
   </div>
   {#if cheer}<p class="sum-cheer"><b lang="ja">{cheer.ja}</b> <span class="dim">({cheer.gloss})</span></p>{/if}
   <p>{#if perfect}Every answer right{:else}{right} of {length} correct{/if}</p>

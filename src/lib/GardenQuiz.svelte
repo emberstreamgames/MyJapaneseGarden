@@ -2,6 +2,7 @@
   import { DECK_LABEL, type Deck, type Item } from '../data/items'
   import ConfirmSheet from './ConfirmSheet.svelte'
   import { QUIZ_LENGTH, REVIEW_MAX, type Plot } from './garden'
+  import Icon from './Icon.svelte'
   import PlantSprite from './PlantSprite.svelte'
   import { Quiz } from './quiz.svelte'
   import QuizCard from './QuizCard.svelte'
@@ -41,7 +42,7 @@
   const startXp = app.xp
   const startWords = knownWords()
   const progress = $derived(mode === 'weed' ? quiz.session.right : quiz.answered)
-  // The dots count the review round once it starts.
+  // The seed row counts the review round once it starts.
   const dots = $derived(quiz.reviewing ? { n: quiz.reviewTotal, at: quiz.reviewDone } : { n: length, at: progress })
 
   let finished = $state(false) // all questions answered and credited
@@ -112,9 +113,12 @@
     <div class="hud">
       <div class="lvl">{verb}</div>
       {#if mode === 'water' || mode === 'groom'}<div class="combo gq" class:hot={quiz.combo >= 3} class:cold={quiz.combo < 2} title="Combo: right answers in a row" aria-label="Combo {quiz.combo}">🔥 {quiz.combo}</div>{/if}
-      <div class="dots" role="progressbar" aria-valuemin="0" aria-valuemax={dots.n} aria-valuenow={Math.min(dots.at, dots.n)} aria-label="Quiz progress">
+      <!-- A seed for each question, sprouting once it's answered. -->
+      <div class="seedrow" role="progressbar" aria-valuemin="0" aria-valuemax={dots.n} aria-valuenow={Math.min(dots.at, dots.n)} aria-label="Quiz progress">
         {#each Array(dots.n) as _, i}
-          <i class:done={i < dots.at} class:now={i === dots.at && (quiz.reviewing || !finished)}></i>
+          <span class="seed-slot">
+            {#if i < dots.at}<span class="seed-sprout"><Icon name="sprout" size={16} /></span>{:else}<i class:now={i === dots.at && (quiz.reviewing || !finished)}></i>{/if}
+          </span>
         {/each}
       </div>
       <button class="quit" onclick={quit}>{quiz.reviewing ? 'Skip' : finished ? 'Close' : 'Quit'}</button>

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { COOLDOWN_MS, SPECIES, STAGE_NAMES, STARTER, msUntilReady, formatWait, phaseOf, type Plot } from './garden'
   import { CELL, GROW, PAD, PLANT_SCALE, SPOTS, VIEW } from './meadow'
+  import Icon from './Icon.svelte'
   import PlantSprite from './PlantSprite.svelte'
   import { STEM_TOP } from './plants'
 
@@ -21,7 +22,8 @@
 
   const phase = $derived(plot ? phaseOf(plot, now) : null)
   const bloomed = $derived(plot?.stage === STAGE_NAMES.length - 1)
-  const badge = $derived(phase === 'thirsty' ? (bloomed ? '✂️' : '💧') : phase === 'resting' ? 'z' : phase === 'ready' ? '✨' : '')
+  // What the plant is thinking about: water, grooming, growing, or sleep while it rests.
+  const badge = $derived(phase === 'thirsty' ? (bloomed ? 'snip' : 'drop') : phase === 'resting' ? 'moon' : phase === 'ready' ? 'star' : null)
   // Float the badge beside the top of the plant, clear of the flower head once it has one.
   const badgeAt = $derived.by(() => {
     if (!plot) return ''
@@ -71,15 +73,9 @@
     <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
     <div class="art" style={artBox} {onclick}><PlantSprite species={plot.species} stage={plot.stage} variant={plot.variant} soil={false} /></div>
     {#if badge && !growing && !leaving}
+      <!-- A thought bubble rising from the plant. -->
       <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-      {#if phase === 'resting'}
-        <!-- Sleeping: three Zs drift up and fade in turn. -->
-        <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-        <span class="zzz" style={badgeAt} aria-hidden="true" {onclick}><i>z</i><i>z</i><i>z</i></span>
-      {:else}
-        <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-        <span class="badge" style={badgeAt} aria-hidden="true" {onclick}>{badge}</span>
-      {/if}
+      <span class="badge" style={badgeAt} aria-hidden="true" {onclick}><span class="thought"><Icon name={badge} size={17} /></span><i></i><i></i></span>
     {/if}
   {/if}
   {#if plot && phase === 'resting'}
@@ -87,8 +83,8 @@
     {@const done = 1 - msUntilReady(plot, now) / COOLDOWN_MS}
     <div class="ptimer" style="top:{pct(CELL.above + 7 * GROW, CELL.h)}" aria-hidden="true">
       <svg class="pclock" viewBox="-6 -6 12 12">
-        <circle r="5.2" fill="#fff" stroke="#3a3f66" stroke-width="1.2" />
-        <path d="M0 -3.2V0L2.2 1.4" fill="none" stroke="#3a3f66" stroke-width="1.1" stroke-linecap="round" />
+        <circle r="5.2" fill="#fffbec" stroke="#76603f" stroke-width="1.2" />
+        <path d="M0 -3.2V0L2.2 1.4" fill="none" stroke="#76603f" stroke-width="1.1" stroke-linecap="round" />
       </svg>
       <span class="pbar"><i style="width:{(done * 100).toFixed(1)}%"></i></span>
     </div>
