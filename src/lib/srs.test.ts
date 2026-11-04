@@ -95,6 +95,16 @@ describe('pickCard', () => {
     expect(pickCard(pool, log, new Set(), 0, T0)?.id).toBe('b')
   })
 
+  it('goes past the cap before repeating a card answered today', () => {
+    const log = { a: seen({ due: T0 + DAY }, T0 - 60_000) }
+    expect(pickCard(pool, log, new Set(), 0, T0)?.id).toBe('b')
+  })
+
+  it('asks a card answered today once nothing else is left', () => {
+    const log = { a: seen({ due: T0 + DAY }, T0 - 60_000) }
+    expect(pickCard(pool, log, new Set(['b', 'c']), 0, T0)?.id).toBe('a')
+  })
+
   it('goes past the cap rather than leave a quiz with nothing to ask', () => {
     expect(pickCard(pool, {}, new Set(), 0, T0)?.id).toBe('a')
   })

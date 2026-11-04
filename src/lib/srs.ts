@@ -1,11 +1,12 @@
 import { Rating, createEmptyCard, fsrs, type Card } from 'ts-fsrs'
+import { dayNumber } from './streak'
 
 // Spaced repetition: each card's memory estimate and when it's next due, worked out by FSRS. Pure,
 // like garden.ts: pass `now` in. Right and wrong map to FSRS's Good and Again, with no rating buttons.
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
-export const NEW_PER_DAY = 10 // new cards a day, across every deck
+export const NEW_PER_DAY = 10 // new cards a day, in each deck
 export const MASTERY_DAYS = 21 // stability that counts as mastered, and unlocks a card's harder versions
 export const KNOWN_DAYS = 7 // stability that counts as a word the player can read
 const REVIEW = 2 // FSRS's State.Review
@@ -85,8 +86,9 @@ export function mostOverdue<T extends { id: string }>(items: T[], log: Log, now:
 }
 
 // The next card for a quiz, skipping those already `asked`: due cards first, then new ones up to the
-// day's cap, in pool order. Failing those it keeps the quiz going with the cards closest to due, and
-// past the cap only when nothing else is left, so a plant can always be watered.
+// day's cap, in pool order. Failing those it keeps the quiz going with the cards closest to due, but
+// not ones already answered today: drilling those again would ask the same few words in every quiz,
+// so it goes past the cap first. Today's cards come back only when nothing else is left.
 export function pickCard<T extends { id: string }>(pool: T[], log: Log, asked: Set<string>, newLeft: number, now: number): T | null {
   const fresh = pool.filter((i) => !asked.has(i.id))
   const seen = fresh.filter((i) => log[i.id]?.srs)
@@ -94,8 +96,13 @@ export function pickCard<T extends { id: string }>(pool: T[], log: Log, asked: S
   const due = mostOverdue(seen, log, now)
   if (due) return due
   if (newLeft > 0 && unseen.length) return unseen[0]
-  if (seen.length) return seen.reduce((a, b) => (log[b.id].srs!.due < log[a.id].srs!.due ? b : a))
-  return unseen[0] ?? null
+  const day = dayNumber(now)
+  const today = seen.filter((i) => dayNumber(log[i.id].last) === day)
+  const earlier = seen.filter((i) => dayNumber(log[i.id].last) !== day)
+  const soonest = (cards: T[]) => cards.reduce((a, b) => (log[b.id].srs!.due < log[a.id].srs!.due ? b : a))
+  if (earlier.length) return soonest(earlier)
+  if (unseen.length) return unseen[0]
+  return today.length ? soonest(today) : null
 }
 
 // The shakiest cards seen so far: most lapses, then least stable. Mastered ones don't need the help.

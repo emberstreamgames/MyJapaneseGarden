@@ -158,7 +158,7 @@
   function thank(knew?: boolean) {
     if (!card) return
     const { v, item } = card
-    card.mastered = !!item && knew !== undefined && record(item.id, knew).mastered
+    card.mastered = !!item && knew !== undefined && record(item, knew).mastered
     card.friend = meetCreature(creatureKey(v.creature, v.look))
     if (!card.friend && !card.mastered) return finish()
     if (!app.muted) sfx.fanfare()

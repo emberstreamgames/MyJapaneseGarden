@@ -1,4 +1,4 @@
-import { N5, type Lesson } from './build'
+import { N5, N5_KANJI, type Lesson } from './build'
 import { grammarItems } from './grammar'
 import { kanjiItems } from './kanji'
 import { n5VocabItems } from './n5vocab'
@@ -10,6 +10,7 @@ export interface Item {
   id: string
   type: Deck
   lesson: Lesson // 0 = Greetings/Numbers, 1-12 = Genki I lessons, 'n5' = N5 Prep
+  also?: Lesson // a second chip that brings in this same card ('n5k' = N5 Kanji)
   front: string // what is shown as the prompt
   back: string // display form of the answer
   answers: string[] // accepted typed answers (lowercase)
@@ -77,14 +78,21 @@ function build(rows: Row[], tag: string): Item[] {
   return out
 }
 
+const kanji = kanjiItems()
+
+// A word written as a single kanji from the kanji deck (一, 山) would be the same question in two
+// decks, so it's left to the kanji plant: each deck's plant should ask only its own kind of card.
+const kanjiFronts = new Set(kanji.map((k) => k.front))
+const ownWord = (i: Item) => !kanjiFronts.has(i.front)
+
 export const ITEMS: Item[] = [
   ...build(basic, 'basic'),
   ...build(dakuten, 'dakuten'),
   ...build(handakuten, 'handakuten'),
   ...build(combo, 'combo'),
-  ...vocabItems(),
-  ...n5VocabItems(),
-  ...kanjiItems(),
+  ...vocabItems().filter(ownWord),
+  ...n5VocabItems().filter(ownWord),
+  ...kanji,
   ...grammarItems(),
 ]
 
@@ -124,6 +132,7 @@ if (import.meta.env.DEV) {
     if (it.answers.some((a) => a !== a.trim().toLowerCase())) problems.push('answers must be trimmed lowercase')
     const l = it.lesson
     if (l !== N5 && (typeof l !== 'number' || !Number.isInteger(l) || l < 0 || l > 12)) problems.push("lesson must be 0-12 or 'n5'")
+    if (it.also !== undefined && it.also !== N5_KANJI) problems.push("also must be 'n5k'")
     if (problems.length) console.warn(`[items] ${it.id}: ${problems.join(', ')}`)
   }
 }

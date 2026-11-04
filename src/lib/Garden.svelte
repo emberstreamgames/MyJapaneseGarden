@@ -6,7 +6,7 @@
   import { DECOR, available } from './decor'
   import Festival from './Festival.svelte'
   import { DECK_LABEL, type Deck } from '../data/items'
-  import { lessonTag } from '../data/build'
+  import { lessonOrder, lessonTag } from '../data/build'
   import GardenQuiz from './GardenQuiz.svelte'
   import GroomSnip from './GroomSnip.svelte'
   import GrowBeam from './GrowBeam.svelte'
@@ -85,7 +85,7 @@
   const streak = $derived(liveStreak(app.streak, today))
   const studiedToday = $derived(app.streak.day === today)
   const chapterLabel = $derived(
-    app.lessons.length ? [...app.lessons].sort((a, b) => (a === 'n5' ? 1 : b === 'n5' ? -1 : +a - +b)).map(lessonTag).join(', ').replaceAll('Lesson ', '') : 'None chosen',
+    app.lessons.length ? [...app.lessons].sort((a, b) => lessonOrder(a) - lessonOrder(b)).map(lessonTag).join(', ').replaceAll('Lesson ', '') : 'None chosen',
   )
   // Worth pointing at only once today's study is done, and never during the tutorial.
   const weak = $derived(!app.tour && studiedToday && tendsLeft() ? weakItems().length : 0)
