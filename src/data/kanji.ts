@@ -1,4 +1,4 @@
-import { fromLessons, withType, type ByLesson } from './build'
+import { N5_KANJI, fromLessons, withType, type ByLesson } from './build'
 import type { Item } from './items'
 
 // [kanji, meaning, readings, ...other accepted meanings]. Use '' for readings to hide them.
@@ -106,7 +106,12 @@ const kanji: ByLesson<Row> = {
   ],
 }
 
+// The N5 Kanji chip's cards. Listed apart from the rows so N4 kanji added to a lesson later stay out of it.
+export const N5_KANJI_LIST = [...'一二三四五六七八九十百千万円時日本人月火水木金土上下中半山川気天今女男見行食東西南北出右左分先生大学外国子小父母高校毎語入聞電車休読何午後前名白雨書友間話来年長']
+const n5 = new Set(N5_KANJI_LIST)
+
 export const kanjiItems = (): Item[] =>
-  fromLessons(kanji, ([k, meaning, readings, ...alts]) =>
-    withType('kanji', `j-${k}`, k, meaning, [meaning, ...alts], readings),
-  )
+  fromLessons(kanji, ([k, meaning, readings, ...alts]) => ({
+    ...withType('kanji', `j-${k}`, k, meaning, [meaning, ...alts], readings),
+    ...(n5.has(k) ? { also: N5_KANJI } : {}),
+  }))

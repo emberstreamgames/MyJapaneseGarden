@@ -36,7 +36,7 @@ export interface Stat {
 // Counts that start over each local day.
 interface Daily {
   day: number
-  newCards: number
+  newCards: Partial<Record<Deck, number>> // cards seen for the first time, per deck
   tends: number // Tend weak words sessions started
   visitors: number // visitors brought by finished quizzes
 }
@@ -57,7 +57,7 @@ interface Saved {
   look: LookState // lawn, soil, bed edging and atmosphere bought in the shop
   tour: TourStep | null // tutorial step, null once finished or skipped
   debug: boolean // hidden debug tools unlocked in Settings
-  lessons: Lesson[] // enabled chips: Genki lessons and/or 'n5'
+  lessons: Lesson[] // enabled chips: Genki lessons, 'n5' (N5 Prep) and/or 'n5k' (N5 Kanji)
   stats: Record<string, Stat>
   daily: Daily
   seedsUsed: number // seed packets spent; one is earned per level
@@ -69,7 +69,9 @@ interface Saved {
 
 const KEY = 'genki-study-v1'
 
-const SAVE_VERSION = 10 // 3: coins, weeds and ants. 4: streak, collection, visitors. 5: decorations. 6: tutorial. 7: 10 plots. 8: upgrades, lawn spots, garden looks. 9: creature collection. 10: spaced repetition, seed packets
+const DECKS: Deck[] = ['hiragana', 'katakana', 'kanji', 'vocab', 'grammar']
+
+const SAVE_VERSION = 11 // 3: coins, weeds and ants. 4: streak, collection, visitors. 5: decorations. 6: tutorial. 7: 10 plots. 8: upgrades, lawn spots, garden looks. 9: creature collection. 10: spaced repetition, seed packets. 11: new cards counted per deck
 
 const defaults = (): Saved => ({
   version: SAVE_VERSION,
@@ -90,7 +92,7 @@ const defaults = (): Saved => ({
   debug: false,
   lessons: [1, 2],
   stats: {},
-  daily: { day: -1, newCards: 0, tends: 0, visitors: 0 },
+  daily: { day: -1, newCards: {}, tends: 0, visitors: 0 },
   seedsUsed: 0,
   xp: 0,
   best: 0,
@@ -114,9 +116,13 @@ function repairStats(raw: unknown): Record<string, Stat> {
   return out
 }
 
+// Saves from before version 11 kept one new-card count for every deck. It can't be split, so it's dropped.
 function repairDaily(raw: unknown): Daily {
   const d = (raw ?? {}) as Partial<Daily>
-  return { day: typeof d.day === 'number' ? d.day : -1, newCards: count(d.newCards), tends: count(d.tends), visitors: count(d.visitors) }
+  const counts = d.newCards && typeof d.newCards === 'object' ? (d.newCards as Record<string, unknown>) : {}
+  const newCards: Daily['newCards'] = {}
+  for (const deck of DECKS) if (counts[deck]) newCards[deck] = count(counts[deck])
+  return { day: typeof d.day === 'number' ? d.day : -1, newCards, tends: count(d.tends), visitors: count(d.visitors) }
 }
 
 // Make loaded or imported data safe. Fields missing from older saves already hold defaults.
@@ -188,7 +194,8 @@ export function toggleLesson(n: Lesson) {
 // which chapters' vocab, kanji and grammar are in.
 const KANA: Deck[] = ['hiragana', 'katakana']
 
-export const inChapters = (i: Item) => KANA.includes(i.type) || app.lessons.includes(i.lesson)
+// A card on two chips (a Genki lesson and N5 Kanji) is still one item, so it's in the pool once.
+export const inChapters = (i: Item) => KANA.includes(i.type) || app.lessons.includes(i.lesson) || (i.also !== undefined && app.lessons.includes(i.also))
 
 export const poolFor = (deck: Deck): Item[] => ITEMS.filter((i) => i.type === deck && inChapters(i))
 
@@ -199,22 +206,26 @@ export const studyPool = (deck: Deck): Item[] => [
   ...poolFor(deck),
 ]
 
-const DECKS: Deck[] = ['hiragana', 'katakana', 'kanji', 'vocab', 'grammar']
-
 // This local day's counts, started afresh when the day has changed.
 function today(now: number): Daily {
   const day = dayNumber(now)
-  if (app.daily.day !== day) app.daily = { day, newCards: 0, tends: 0, visitors: 0 }
+  if (app.daily.day !== day) app.daily = { day, newCards: {}, tends: 0, visitors: 0 }
   return app.daily
 }
 
-const countToday = (key: 'newCards' | 'tends' | 'visitors', now: number) => (app.daily.day === dayNumber(now) ? app.daily[key] : 0)
+const isToday = (now: number) => app.daily.day === dayNumber(now)
+const countToday = (key: 'tends' | 'visitors', now: number) => (isToday(now) ? app.daily[key] : 0)
 
-export const newLeft = (now = Date.now()) => NEW_PER_DAY - countToday('newCards', now)
+// Each deck has its own daily allowance, so kana practice doesn't use up the day's new vocab.
+export const newLeft = (deck: Deck, now = Date.now()) => NEW_PER_DAY - (isToday(now) ? (app.daily.newCards[deck] ?? 0) : 0)
 
 // `mastered` and `known` are true when this answer carried the card over that line.
-export function record(id: string, correct: boolean, now = Date.now()): { mastered: boolean; known: boolean } {
-  if (!app.stats[id]) today(now).newCards++
+export function record(item: Item, correct: boolean, now = Date.now()): { mastered: boolean; known: boolean } {
+  const id = item.id
+  if (!app.stats[id]) {
+    const counts = today(now).newCards
+    counts[item.type] = (counts[item.type] ?? 0) + 1
+  }
   const s = (app.stats[id] ??= { c: 0, w: 0, streak: 0, last: 0 })
   const before = { mastered: isMastered(s), known: isKnown(s) }
   if (correct) {

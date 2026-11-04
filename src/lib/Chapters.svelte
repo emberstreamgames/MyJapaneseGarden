@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { N5, lessonTag, type Lesson } from '../data/build'
+  import { N5, N5_KANJI, lessonTag, type Lesson } from '../data/build'
   import { app, chapterSheet, poolFor, toggleLesson } from './store.svelte'
 
   // Which chapters' vocab, kanji and grammar are in study. Kana are always in (store.svelte.ts poolFor).
-  const lessons: Lesson[] = [...Array.from({ length: 13 }, (_, i) => i), N5]
+  const lessons: Lesson[] = [...Array.from({ length: 13 }, (_, i) => i), N5, N5_KANJI]
   const close = () => (chapterSheet.open = false)
   const counts = $derived(`${poolFor('vocab').length} vocabulary · ${poolFor('kanji').length} kanji · ${poolFor('grammar').length} grammar`)
 
@@ -23,7 +23,7 @@
     <div class="chapters" role="group" aria-label="Chapters to study">
       {#each lessons as n (n)}
         <button class="chip" class:on={app.lessons.includes(n)} class:n5={n === N5} aria-pressed={app.lessons.includes(n)} aria-label={lessonTag(n)} onclick={() => toggleLesson(n)}>
-          {n === N5 ? 'N5 Prep' : n === 0 ? 'Intro' : n}
+          {typeof n === 'number' && n > 0 ? n : lessonTag(n)}
         </button>
       {/each}
     </div>

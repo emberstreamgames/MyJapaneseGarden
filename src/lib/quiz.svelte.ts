@@ -137,7 +137,7 @@ export class Quiz {
     if (this.reviewing) return this.ask(this.missed[this.reviewDone].item)
     const pool = this.pool
     const now = Date.now()
-    const pickNext = () => pickCard(pool, app.stats, this.asked, newLeft(now), now)
+    const pickNext = () => pickCard(pool, app.stats, this.asked, newLeft(this.deck, now), now)
     let pick = pickNext()
     // Everything's been asked: go round again, without repeating the card just shown.
     if (!pick) {
@@ -198,7 +198,7 @@ export class Quiz {
     } else {
       this.answered++
       const seen = !!app.stats[id]
-      const crossed = record(id, ok)
+      const crossed = record(this.current, ok)
       // A harder version reaching mastery unlocks nothing and isn't a new milestone.
       if (crossed.mastered && !this.current.side) {
         this.mastered.push({ item: this.current, unlocked: EXTRA_CARDS.some((e) => e.base === id) })
