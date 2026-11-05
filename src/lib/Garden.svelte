@@ -5,7 +5,7 @@
   import Decor from './Decor.svelte'
   import { DECOR, available } from './decor'
   import Festival from './Festival.svelte'
-  import { DECK_LABEL, type Deck } from '../data/items'
+  import { DECK_LABEL, type Deck, type Item } from '../data/items'
   import { lessonOrder, lessonTag } from '../data/build'
   import GardenQuiz from './GardenQuiz.svelte'
   import GroomSnip from './GroomSnip.svelte'
@@ -21,7 +21,7 @@
   import * as sfx from './sfx'
   import Sky from './Sky.svelte'
   import StarterQuiz from './StarterQuiz.svelte'
-  import { antCoinReady, app, chapterSheet, finishQuiz, growPlot, knownWords, level, levelProgress, markSeen, poolFor, pullWeed, retireStarter, seasonPreview, setTour, tendWeeds, tendsLeft, tourDid, waterStarterPlot, weakItems, type Preserved } from './store.svelte'
+  import { antCoinReady, app, chapterSheet, finishQuiz, growPlot, knownWords, level, levelProgress, markSeen, poolFor, pullWeed, retireStarter, seasonPreview, setTour, tendWeeds, tendsLeft, tourDid, waterStarterPlot, weakItems, weedCards, weedDeck, type Preserved } from './store.svelte'
   import { dayNumber, liveStreak, rainedDays } from './streak'
   import Visitors from './Visitors.svelte'
   import Welcome, { type Away } from './Welcome.svelte'
@@ -36,7 +36,8 @@
   let now = $state(Date.now())
   let selected = $state<number | null>(null)
   // `target` is the plot index; `spots` are the weeds' spots for a weed quiz.
-  let quiz = $state<{ target: number; deck: Deck; mode: 'water' | 'groom' | 'weed'; bonus: number; spots: number[] } | null>(null)
+  // `cards` are a weed run's weak cards, asked before the deck's usual questions.
+  let quiz = $state<{ target: number; deck: Deck; mode: 'water' | 'groom' | 'weed'; bonus: number; spots: number[]; cards?: Item[] } | null>(null)
   let guide = $state<number | null>(null) // the starter plant whose guided question is on screen
   let watered: number | null = null // plot whose watering quiz finished, splashed on return
   let splash = $state<number | null>(null)
@@ -46,7 +47,7 @@
   let snip = $state<{ index: number; last: boolean } | null>(null)
   let hud = $state<'level' | 'streak' | 'coins' | null>(null)
   let away = $state<Away | null>(null)
-  let weedAsk = $state<{ w: Weed; deck: Deck; count: number } | null>(null) // the pre-screen before a weed's question
+  let weedAsk = $state<{ w: Weed; deck: Deck; count: number; weak: boolean } | null>(null) // the pre-screen before a weed's question
   let earned = 0 // perfect and streak coins from the quiz just finished, flown in on return
   let growing = $state<{ index: number; species: Species; stage: number; free: boolean }[]>([]) // plots under a sunbeam; free once it has passed
 
@@ -178,22 +179,28 @@
     quiz = { target: i, deck: p.deck, mode: p.stage === BLOOMED ? 'groom' : 'water', bonus: completionBonus(p), spots: [] }
   }
 
-  // A weed asks one question from any deck the enabled chapters cover. The deck is picked first so
-  // the pre-screen can say what kind of question is coming. The tutorial's weed asks hiragana, the gentlest.
+  // A weed asks a word that needs tending (weedDeck). The deck is picked first so the pre-screen can
+  // say what kind of question is coming. Before anything's been studied, any deck the chapters cover will
+  // do. The tutorial's weed asks hiragana, the gentlest.
   function askWeed(w: Weed) {
+    const count = app.tour ? 1 : app.weeds.length
+    const weak = app.tour ? null : weedDeck()
+    if (weak) return (weedAsk = { w, deck: weak, count, weak: true })
     const decks = app.tour && poolFor('hiragana').length ? ['hiragana' as const] : DECKS.filter((d) => poolFor(d).length)
-    weedAsk = { w, deck: decks[Math.floor(Math.random() * decks.length)] ?? 'hiragana', count: app.tour ? 1 : app.weeds.length }
+    weedAsk = { w, deck: decks[Math.floor(Math.random() * decks.length)] ?? 'hiragana', count, weak: false }
   }
 
   // `all` pulls every weed on the lawn in one run, starting with the one tapped.
   function startWeed(all: boolean) {
     if (!weedAsk) return
-    const { w, deck } = weedAsk
+    const { w, deck, weak } = weedAsk
     weedAsk = null
     growing = []
     pulled = []
     const others = all ? app.weeds.filter((o) => o.spot !== w.spot).map((o) => o.spot) : []
-    quiz = { target: w.spot, deck, mode: 'weed', bonus: WEED_BONUS_XP, spots: [w.spot, ...others] }
+    const spots = [w.spot, ...others]
+    const cards = weak ? weedCards(deck, spots.length) : []
+    quiz = { target: w.spot, deck, mode: 'weed', bonus: WEED_BONUS_XP, spots, cards: cards.length ? cards : undefined }
   }
 
   function closeQuiz() {
@@ -257,7 +264,7 @@
   <StarterQuiz onDone={starterWatered} />
 {:else if quiz}
   {@const q = quiz}
-  <GardenQuiz deck={q.deck} mode={q.mode} plot={q.mode === 'weed' ? null : app.garden[q.target]} bonus={q.bonus} weeds={q.spots.length || 1} onComplete={(right) => complete(q.target, q.mode, right)} onClose={closeQuiz} {onTend} />
+  <GardenQuiz deck={q.deck} mode={q.mode} cards={q.cards} plot={q.mode === 'weed' ? null : app.garden[q.target]} bonus={q.bonus} weeds={q.spots.length || 1} onComplete={(right) => complete(q.target, q.mode, right)} onClose={closeQuiz} {onTend} />
 {:else}
   <section class="garden">
     <!-- A wooden sign hanging on two ropes. -->
@@ -366,6 +373,7 @@
         <div class="weed-ask-art"><WeedSprite kind={a.w.kind} /></div>
         <h2>Pull the weeds!</h2>
         <p>Answer a <b>{DECK_LABEL[a.deck]}</b> question to earn coins!</p>
+        {#if a.weak}<p class="dim">It's one of the words that need tending.</p>{/if}
         <p class="coins">+{WEED_COINS} 🪙 · +{WEED_BONUS_XP} XP</p>
         <button class="primary big-btn" onclick={() => startWeed(false)}>Start</button>
         {#if a.count > 1}

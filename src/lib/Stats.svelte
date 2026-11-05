@@ -157,6 +157,7 @@
         <option value="mix">Mix</option>
         <option value="choice">Multiple choice</option>
         <option value="type">Typed</option>
+        <option value="draw">Drawing (kana and kanji)</option>
       </select>
     </label>
     <label><input type="checkbox" bind:checked={app.muted} onchange={save} /> Mute sounds</label>
@@ -182,6 +183,7 @@
   <div class="credits dim">
     <p>Word and kanji selection follows the JLPT lists by Jonathan Waller, <a href="https://www.tanos.co.uk/jlpt/" target="_blank" rel="noopener">tanos.co.uk</a> (CC BY).</p>
     <p>JLPT levels here are estimates: the test's organizers publish no official lists.</p>
+    <p>Stroke data from <a href="https://kanjivg.tagaini.net" target="_blank" rel="noopener">KanjiVG</a> by Ulrich Apel and contributors (<a href="https://creativecommons.org/licenses/by-sa/3.0/" target="_blank" rel="noopener">CC BY-SA 3.0</a>). The app's stroke file is adapted from it and shared under the same licence.</p>
     <p>Review scheduling by <a href="https://github.com/open-spaced-repetition/ts-fsrs" target="_blank" rel="noopener">ts-fsrs</a> (MIT). Built with <a href="https://svelte.dev" target="_blank" rel="noopener">Svelte</a> (MIT).</p>
   </div>
 

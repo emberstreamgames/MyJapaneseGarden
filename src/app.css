@@ -193,7 +193,7 @@ input[type='text'], input:not([type]) {
 }
 input:focus { outline: none; border-color: var(--accent); }
 
-.row { display: flex; gap: 10px; align-items: center; justify-content: center; margin-top: 14px; }
+.row { display: flex; gap: 10px; align-items: center; justify-content: center; margin-top: 14px; scroll-margin-bottom: calc(110px + env(safe-area-inset-bottom)); }
 .row button { flex: 1; padding: 14px; font-size: 1.05rem; }
 .verdict { font-weight: 700; font-size: 1.1rem; flex: 1; text-align: center; }
 .verdict.right { color: var(--good); }
@@ -876,4 +876,43 @@ input:focus { outline: none; border-color: var(--accent); }
 
 @media (prefers-reduced-motion: reduce) {
   .mochi, .face .eye, .row .react { animation: none !important; }
+}
+
+/* Drawing questions (DrawPad.svelte): a practice sheet with a dashed cross, ink in the text colour,
+   and the right strokes drawn over in order after a miss or a stroke-order slip. */
+.card.drawing { gap: 10px; padding-top: 14px; }
+.big.draw-prompt { font-size: clamp(1.9rem, 9vw, 2.8rem); line-height: 1.2; }
+.draw-ask { margin-top: -10px; font-size: 0.9rem; }
+.pad { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
+/* Sized to the screen height too, so Check stays above the dock on a phone. */
+.pad-wrap { position: relative; width: min(100%, 280px, max(180px, calc(100dvh - 480px))); aspect-ratio: 1; }
+.pad-away { border-radius: 22px; background: var(--panel2); opacity: 0.5; }
+.pad-sheet { display: block; width: 100%; height: 100%; border-radius: 22px; background: #fffdf5; outline: 2.5px dashed var(--line); outline-offset: -7px; box-shadow: inset 0 2px 8px #0000000f; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: crosshair; }
+.pad-sheet.done { cursor: default; }
+.pad-guide line { stroke: var(--line); stroke-width: 0.7; stroke-dasharray: 3 3; }
+.pad-ink polyline { fill: none; stroke: var(--text); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; transition: stroke 0.3s, opacity 0.3s; }
+.pad-ink.ok polyline { stroke: var(--good); }
+.pad-ink.faint polyline { opacity: 0.25; }
+.pad-answer path { fill: none; stroke: var(--bad); stroke-width: 3.6; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; animation: pad-stroke 0.5s ease-in-out forwards; animation-delay: calc(0.3s + var(--i) * 0.6s); }
+.pad-answer text { font-size: 6.5px; font-weight: 700; fill: var(--gold); opacity: 0; animation: pad-num 0.2s forwards; animation-delay: calc(0.3s + var(--i) * 0.6s); }
+@keyframes pad-stroke { to { stroke-dashoffset: 0; } }
+@keyframes pad-num { to { opacity: 1; } }
+.pad-grow { position: absolute; right: 8px; bottom: 8px; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border-radius: 50%; background: var(--panel2); font-size: 1.2rem; }
+.pad-tools { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; width: min(100%, 320px); }
+.pad-tools button { flex: 1; min-height: 44px; }
+.pad-tools .primary { flex: 1.4; }
+.pad-tools button:not(.primary) { background: var(--panel2); }
+.order-flag { padding: 10px 12px; border-radius: 14px; background: color-mix(in srgb, var(--honey) 45%, var(--panel)); }
+.order-flag b { color: var(--text); display: block; }
+/* Over the dock and sheets, under confirmations. */
+.pad-full { position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: max(12px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); background: var(--bg); animation: pop-in 0.25s cubic-bezier(0.2, 1.2, 0.4, 1); }
+.pad-full-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: min(100%, 640px); }
+.pad-full-label { font-weight: 700; font-size: 1.1rem; }
+.pad-shrink { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border-radius: 50%; font-size: 1.2rem; }
+.pad-full-sheet { width: min(100%, calc(100dvh - 190px), 640px); aspect-ratio: 1; }
+.pad-full .pad-tools { width: min(100%, 480px); }
+@media (prefers-reduced-motion: reduce) {
+  .pad-answer path { animation: none; stroke-dashoffset: 0; }
+  .pad-answer text { animation: none; opacity: 1; }
+  .pad-full { animation: none; }
 }

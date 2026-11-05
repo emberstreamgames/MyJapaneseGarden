@@ -18,9 +18,9 @@ import { NEW_PER_DAY, isKnown, isMastered, mostOverdue, normalizeSrs, review, se
 import { hasStarter, nextStep, normalizeTour, type TourStep } from './tour'
 import type { FestivalId, Hours, Season } from './seasons'
 
-export type Mode = 'mix' | 'choice' | 'type'
+export type Mode = 'mix' | 'choice' | 'type' | 'draw'
 
-const MODES: Mode[] = ['mix', 'choice', 'type']
+const MODES: Mode[] = ['mix', 'choice', 'type', 'draw']
 
 // Older saves may hold the removed 'flip' mode (or junk): fall back to mix.
 const normalizeMode = (m: unknown): Mode => (MODES.includes(m as Mode) ? (m as Mode) : 'mix')
@@ -247,6 +247,17 @@ export const knownWords = () => new Set(ITEMS.filter((i) => i.type === 'vocab' &
 export const tendsLeft = (now = Date.now()) => Math.max(0, TEND_PER_DAY - countToday('tends', now))
 
 export const weakItems = () => weakest(DECKS.flatMap(studyPool), app.stats, TEND_LENGTH)
+
+// Weeds ask the words that need tending. The deck comes from a random one of the shakiest cards, so
+// a deck holding more of them comes up more often. Null before anything has been studied.
+export function weedDeck(): Deck | null {
+  const weak = weakItems()
+  return weak.length ? weak[Math.floor(Math.random() * weak.length)].type : null
+}
+
+// That deck's shakiest cards, asked before anything else in a weed run. A few spare, so a wrong
+// answer can swap in a different card; past those, the run carries on with the deck's usual questions.
+export const weedCards = (deck: Deck, count: number): Item[] => weakest(studyPool(deck), app.stats, Math.max(TEND_LENGTH, count + 2))
 
 export function startTend(now = Date.now()): boolean {
   if (!tendsLeft(now)) return false
