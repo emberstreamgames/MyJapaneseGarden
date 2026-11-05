@@ -8,7 +8,7 @@
   import QuizCard from './QuizCard.svelte'
   import QuizSummary from './QuizSummary.svelte'
   import * as sfx from './sfx'
-  import { app, chapterSheet, holdLevelUps, knownWords, quizState, type QuizReward } from './store.svelte'
+  import { app, chapterSheet, holdLevelUps, knownWords, quizState, studyPool, type QuizReward } from './store.svelte'
 
   // A fixed-length quiz for watering or grooming a plant: answering all 10 questions is the only
   // requirement. Its misses are then asked once more, for practice only. Weeds need one correct
@@ -28,7 +28,7 @@
     deck: Deck
     mode: 'water' | 'groom' | 'weed' | 'tend'
     plot?: Plot | null // the plant being tended, shown during the quiz and in the summary
-    cards?: Item[] // a fixed list of questions, for Tend weak words
+    cards?: Item[] // a fixed list of questions: Tend weak words, or a weed run's weak cards (asked first)
     bonus: number // completion XP, shown in the summary
     weeds?: number // how many weeds a weed quiz is pulling
     onComplete: (right: number) => QuizReward | null // fires once, when the last question is answered, or on leaving a weed run early
@@ -36,7 +36,12 @@
     onTend?: () => void // go to Tend weak words from the summary
   } = $props()
 
-  const quiz = new Quiz(() => deck, () => cards)
+  // A weed is a quick single question: no drawing there. Its weak cards come first, then the deck's usual ones.
+  const quiz = new Quiz(() => deck, () => cards, {
+    draw: () => mode !== 'weed',
+    flatXp: () => mode === 'tend',
+    more: () => (mode === 'weed' && cards ? studyPool(deck) : undefined),
+  })
   const length = $derived(mode === 'weed' ? weeds : cards ? cards.length : QUIZ_LENGTH)
   // Where the player started, for the summary's XP bar and word count.
   const startXp = app.xp

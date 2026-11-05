@@ -1,9 +1,11 @@
 <script lang="ts">
-  import { DECK_LABEL, DECK_PROMPT, SIDE_LABEL } from '../data/items'
+  import { DECK_LABEL, DECK_PROMPT, DRAW_PROMPT, SIDE_LABEL } from '../data/items'
+  import DrawPad from './DrawPad.svelte'
   import { HINT_COST } from './garden'
   import Mochi from './Mochi.svelte'
   import { CHEERS, NEAR_MISS, type Quiz } from './quiz.svelte'
   import { app } from './store.svelte'
+  import { strokesFor } from './strokes'
 
   const AUTO_NEXT_MS = 800
   const MILESTONE_MS = 1500 // long enough to read a combo callout's gloss
@@ -16,6 +18,14 @@
   }: { quiz: Quiz; onNext: () => void; nextLabel?: string; auto?: boolean } = $props()
 
   let input = $state<HTMLInputElement>()
+  let row = $state<HTMLDivElement>()
+
+  // A drawing card is tall: bring the verdict and Next up from under the dock once it's answered.
+  $effect(() => {
+    if (!quiz.result || quiz.kind !== 'draw' || !row) return
+    const still = matchMedia('(prefers-reduced-motion: reduce)').matches
+    row.scrollIntoView({ block: 'nearest', behavior: still ? 'auto' : 'smooth' })
+  })
 
   // Paying for a hint shouldn't take the cursor (or a phone's keyboard) away from the answer box.
   function reveal() {
@@ -24,10 +34,12 @@
   }
 
   // A right answer moves on by itself, unless there's something new to read: a kanji's readings
-  // only appear now, so that card waits (unless they were already bought). So does a card just mastered.
+  // only appear now, so that card waits (unless they were already bought). So does a card just mastered,
+  // and a drawing in the wrong stroke order, so the right order can be watched.
   $effect(() => {
     const c = quiz.current
-    if (!auto || quiz.result !== 'right' || quiz.justMastered || (c?.type === 'kanji' && !c.side && !quiz.revealed)) return
+    if (!auto || quiz.result !== 'right' || quiz.justMastered || quiz.verdict?.order) return
+    if (c?.type === 'kanji' && !c.side && quiz.kind !== 'draw' && !quiz.revealed) return
     const t = setTimeout(onNext, quiz.praise.big ? MILESTONE_MS : AUTO_NEXT_MS)
     return () => clearTimeout(t)
   })
@@ -44,16 +56,25 @@
 
 {#if quiz.current}
   {@const current = quiz.current}
-  {@const reversed = current.side === 'reverse'}
+  {@const drawing = quiz.kind === 'draw'}
+  {@const reversed = current.side === 'reverse' || drawing}
+  {@const prompt = drawing ? current.back : current.front}
+  <!-- The character to show: the one matched (ぢ for a ji question), or the card's own after a miss. -->
+  {@const drawn = (quiz.verdict?.ok && quiz.verdict.char) || current.front}
   {#key current.id}
     <div class="stage">
       {#key quiz.shake}
-        <div class="card" class:shake={quiz.result === 'wrong' && !quiz.unsure} class:right={quiz.result === 'right'}>
+        <div class="card" class:drawing class:shake={quiz.result === 'wrong' && !quiz.unsure} class:right={quiz.result === 'right'}>
           <div class="tagline">
             {DECK_LABEL[current.type]} · {current.side ? SIDE_LABEL[current.side] : current.tag}
             {#if quiz.isNew}<span class="new-tag">New</span>{/if}
           </div>
-          <div class="big" class:mid={!reversed && current.front.length === 4} class:long={reversed || current.front.length > 4} lang={reversed ? 'en' : 'ja'}>{current.front}</div>
+          {#if drawing}
+            <div class="big draw-prompt" lang="en">{prompt}</div>
+            <div class="dim draw-ask">{DRAW_PROMPT[current.type]}</div>
+          {:else}
+            <div class="big" class:mid={!reversed && current.front.length === 4} class:long={reversed || current.front.length > 4} lang={reversed ? 'en' : 'ja'}>{current.front}</div>
+          {/if}
           {#if quiz.hintLocked}
             <div class="hint-buy">
               <button disabled={app.coins < HINT_COST} onclick={reveal}>🪙 {HINT_COST} · Show readings</button>
@@ -63,7 +84,16 @@
             <div class="hint">{current.hint}</div>
           {/if}
 
-          {#if quiz.kind === 'type'}
+          {#if drawing}
+            <DrawPad
+              bind:strokes={quiz.ink}
+              onCheck={(s) => quiz.submitDrawing(s)}
+              done={!!quiz.result}
+              ok={quiz.result === 'right'}
+              show={quiz.result === 'wrong' || quiz.verdict?.order ? (strokesFor(drawn) ?? null) : null}
+              label="{prompt} · {DRAW_PROMPT[current.type]}"
+            />
+          {:else if quiz.kind === 'type'}
             {#if !quiz.result}
               <form onsubmit={(e) => quiz.submitTyped(e)}>
                 <!-- svelte-ignore a11y_autofocus -->
@@ -92,9 +122,24 @@
             <button class="linkish idk" onclick={() => quiz.dontKnow()}>I don't know</button>
           {/if}
 
+          {#if drawing && quiz.result === 'right' && quiz.verdict?.order}
+            <p class="explain order-flag" role="status">
+              <b>Check the stroke order.</b> Right character, but the strokes went in a different order. Watch how <span lang="ja">{drawn}</span> is written.
+            </p>
+          {/if}
+
           {#if quiz.result === 'wrong'}
             <p class="explain">
-              {#if current.type === 'grammar'}
+              {#if drawing}
+                {@const v = quiz.verdict}
+                {#if v?.reason === 'count'}
+                  <b lang="ja">{current.front}</b> has {v.want} strokes; you drew {v.drawn}.
+                {:else if v?.reason === 'like'}
+                  That looks more like <b lang="ja">{v.like}</b>. “{current.back}” is written <b lang="ja">{current.front}</b>.
+                {:else}
+                  “{current.back}” is written <b lang="ja">{current.front}</b>.
+                {/if}
+              {:else if current.type === 'grammar'}
                 The missing word is <b>{current.back}</b>
               {:else if current.side === 'reverse'}
                 “{current.front}” is <b lang="ja">{current.back}</b>
@@ -121,7 +166,7 @@
     </div>
 
     {#if quiz.result}
-      <div class="row">
+      <div class="row" bind:this={row}>
         <!-- Mochi dances for a right answer and droops a little for a miss. -->
         <span class="react {quiz.result}" aria-hidden="true"><Mochi size={46} mood={quiz.result === 'right' ? 'glad' : quiz.unsure ? 'happy' : 'shy'} /></span>
         {#if quiz.result === 'right'}

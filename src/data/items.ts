@@ -144,3 +144,22 @@ export const DECK_LABEL: Record<Deck, string> = {
   vocab: 'Vocabulary',
   grammar: 'Grammar',
 }
+
+// Drawn answers: single kana and kanji. Combos (きゃ) would need two characters on one pad.
+export const canDraw = (it: Item): boolean =>
+  (it.type === 'hiragana' || it.type === 'katakana' || it.type === 'kanji') && !it.side && [...it.front].length === 1
+
+// Any character of the deck with the same main answer passes: じ or ぢ for "ji", ず or づ for "zu".
+// Only the main romaji counts, so "o" doesn't take を (whose alternates include "o"), nor "e" へ.
+export const drawAnswers = (it: Item): string[] =>
+  ITEMS.filter((i) => i.type === it.type && canDraw(i) && i.back === it.back).map((i) => i.front)
+
+// The deck's drawable characters, to tell look-alikes (れ, わ) apart.
+export const drawRivals = (deck: Deck): string[] => ITEMS.filter((i) => i.type === deck && canDraw(i)).map((i) => i.front)
+
+// What a drawing question asks for, under the prompt.
+export const DRAW_PROMPT: Partial<Record<Deck, string>> = {
+  hiragana: 'Draw it in hiragana',
+  katakana: 'Draw it in katakana',
+  kanji: 'Draw the kanji',
+}

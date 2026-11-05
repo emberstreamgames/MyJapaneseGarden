@@ -1,10 +1,11 @@
-import { EXTRA_CARDS, ITEMS, type Deck, type Item } from '../data/items'
+import { EXTRA_CARDS, ITEMS, canDraw, drawAnswers, drawRivals, type Deck, type Item } from '../data/items'
 import { REVIEW_MAX, TEND_XP } from './garden'
 import { app, buyHint, inChapters, newLeft, record, save, studyPool } from './store.svelte'
 import { pickCard } from './srs'
 import * as sfx from './sfx'
+import { judge, loadStrokes, strokesFor, type Pt, type Verdict } from './strokes'
 
-export type Kind = 'choice' | 'type'
+export type Kind = 'choice' | 'type' | 'draw'
 
 // Said after a wrong answer, with any Japanese glossed so it can be read at any level.
 export const CHEERS = [
@@ -89,17 +90,38 @@ export class Quiz {
   reviewDone = $state(0)
   stronger = $state(0) // right answers on cards already met
   met = $state(0) // cards seen for the first time
+  verdict = $state<Verdict | null>(null) // how the last drawing was judged
+  ink = $state<Pt[][]>([]) // the drawing so far; kept here so the card's shake doesn't wipe it
 
   private deckOf: () => Deck
   private cards?: () => Item[] | undefined
   private lastId = ''
   private n = 0
   private asked = new Set<string>() // cards asked since the pool last ran out
+  private draws: () => boolean
+  private flatXp: () => boolean
+  private more: () => Item[] | undefined
 
   // `cards` replaces the deck's pool with a fixed list, which may mix decks (Tend weak words).
-  constructor(deckOf: () => Deck, cards?: () => Item[] | undefined) {
+  // `more` is asked once `cards` runs out (a weed run: weak cards first, then the deck's usual ones).
+  // `draw: false` keeps drawing out of quick one-question moments (weeds). `flatXp` pays TEND_XP, no combo.
+  constructor(
+    deckOf: () => Deck,
+    cards?: () => Item[] | undefined,
+    opts: { draw?: () => boolean; flatXp?: () => boolean; more?: () => Item[] | undefined } = {},
+  ) {
     this.deckOf = deckOf
     this.cards = cards
+    this.draws = opts.draw ?? (() => true)
+    this.flatXp = opts.flatXp ?? (() => false)
+    this.more = opts.more ?? (() => undefined)
+    // The first question is asked before the stroke file arrives: give it its chance to be drawn,
+    // unless the player has already started on it.
+    if (this.draws())
+      void loadStrokes().then(() => {
+        const c = this.current
+        if (c && !this.result && !this.typed && !this.reviewing && this.kind !== 'draw') this.ask(c)
+      })
   }
 
   get deck(): Deck {
@@ -112,7 +134,7 @@ export class Quiz {
 
   // A kanji's readings give it away, so they cost coins until the question is answered.
   get hintLocked(): boolean {
-    return this.current?.type === 'kanji' && !this.current.side && !this.revealed && !this.result
+    return this.current?.type === 'kanji' && !this.current.side && this.kind !== 'draw' && !this.revealed && !this.result
   }
 
   revealHint() {
@@ -137,13 +159,15 @@ export class Quiz {
     if (this.reviewing) return this.ask(this.missed[this.reviewDone].item)
     const pool = this.pool
     const now = Date.now()
-    const pickNext = () => pickCard(pool, app.stats, this.asked, newLeft(this.deck, now), now)
-    let pick = pickNext()
+    const pickNext = (from: Item[]) => pickCard(from, app.stats, this.asked, newLeft(this.deck, now), now)
+    let pick = pickNext(pool)
+    const more = this.more()
+    if (!pick && more) pick = pickNext(more)
     // Everything's been asked: go round again, without repeating the card just shown.
     if (!pick) {
       this.asked.clear()
       if (pool.length > 1) this.asked.add(this.lastId)
-      pick = pickNext()
+      pick = pickNext(pool)
     }
     if (!pick) {
       this.current = null
@@ -163,9 +187,19 @@ export class Quiz {
     this.near = false
     this.unsure = false
     this.justMastered = false
+    this.verdict = null
+    this.ink = []
     this.isNew = !app.stats[pick.id]
     // Japanese can't be typed on every keyboard, so harder versions are always multiple choice.
-    const kinds: Kind[] = pick.side ? ['choice'] : app.mode === 'mix' ? ['choice', 'type'] : [app.mode]
+    // Drawing needs the character met once: a first meeting can't be recalled by hand.
+    const draw = this.draws() && !this.isNew && canDraw(pick) && !!strokesFor(pick.front)
+    const kinds: Kind[] = pick.side
+      ? ['choice']
+      : app.mode === 'draw' && draw
+        ? ['draw']
+        : app.mode === 'mix' || app.mode === 'draw'
+          ? ['choice', 'type', ...(draw ? (['draw'] as const) : [])]
+          : [app.mode]
     this.kind = kinds[Math.floor(Math.random() * kinds.length)]
     if (this.kind === 'choice') {
       this.makeOptions(pick)
@@ -214,7 +248,7 @@ export class Quiz {
         this.session.right++
         if (this.combo > app.best) app.best = this.combo
         if (this.combo > this.bestCombo) this.bestCombo = this.combo
-        const amount = this.cards?.() ? TEND_XP : 10 + Math.min(this.combo, 10) * 2
+        const amount = this.flatXp() ? TEND_XP : 10 + Math.min(this.combo, 10) * 2
         app.xp += amount
         this.xp += amount
         this.gain = { id: ++this.n, amount }
@@ -270,6 +304,15 @@ export class Quiz {
     this.answer(ok)
   }
 
+  // Any accepted character passes (じ or ぢ for "ji"). Wrong stroke order still counts as right;
+  // the card flags it and shows the order (verdict.order).
+  submitDrawing(strokes: Pt[][]) {
+    if (!this.current || this.result || !strokes.length) return
+    const withStrokes = (chars: string[]) => Object.fromEntries(chars.flatMap((c) => (strokesFor(c) ? [[c, strokesFor(c)!]] : [])))
+    this.verdict = judge(strokes, withStrokes(drawAnswers(this.current)), withStrokes(drawRivals(this.current.type)))
+    this.answer(this.verdict.ok)
+  }
+
   choose(o: string) {
     if (!this.current || this.result) return
     this.picked = o
@@ -279,8 +322,10 @@ export class Quiz {
   // (Re)start whenever the deck or the enabled chapters change the pool. Call from an $effect.
   sync() {
     const pool = this.pool
+    const more = this.more() ?? []
     void pool.length
     void this.deck
-    if (!this.current || !pool.some((i) => i.id === this.current!.id)) this.next()
+    const id = this.current?.id
+    if (!id || !(pool.some((i) => i.id === id) || more.some((i) => i.id === id))) this.next()
   }
 }
