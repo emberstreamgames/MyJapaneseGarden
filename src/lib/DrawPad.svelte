@@ -77,6 +77,22 @@
     return { destroy: () => node.remove() }
   }
 
+  // iOS Safari ignores touch-action on <svg>, so a vertical stroke turns into a page scroll and the
+  // browser cancels the pointer mid-line. Non-passive touch listeners that cancel the default stop it.
+  function noScroll(node: SVGSVGElement) {
+    const stop = (e: TouchEvent) => {
+      if (!done) e.preventDefault()
+    }
+    node.addEventListener('touchstart', stop, { passive: false })
+    node.addEventListener('touchmove', stop, { passive: false })
+    return {
+      destroy() {
+        node.removeEventListener('touchstart', stop)
+        node.removeEventListener('touchmove', stop)
+      },
+    }
+  }
+
   function onKey(e: KeyboardEvent) {
     if (full && e.key === 'Escape') full = false
   }
@@ -95,6 +111,7 @@
     onpointermove={move}
     onpointerup={up}
     onpointercancel={up}
+    use:noScroll
   >
     <!-- Practice-paper guides: a dashed cross through the middle. -->
     <g class="pad-guide">
