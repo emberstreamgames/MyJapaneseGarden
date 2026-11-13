@@ -832,7 +832,8 @@ input:focus { outline: none; border-color: var(--accent); }
 .tod, .festival { position: absolute; top: 0; left: calc(-1 * var(--bleed)); width: calc(100% + 2 * var(--bleed)); height: 100%; border-radius: 20px; pointer-events: none; }
 .tod { transition: background 1s; }
 .tod.dusk { background: linear-gradient(180deg, #ff8a3c33, #7c5cff22); }
-.tod.night { background: radial-gradient(ellipse at 50% 45%, #0b144055, #0b1440a0); }
+/* Light enough to keep plants and badges easy to read; the edges darken more than the bed. */
+.tod.night { background: radial-gradient(ellipse at 50% 45%, #0b144026, #0b144070); }
 .festival { overflow: hidden; }
 .sky.sparse { background: none; }
 

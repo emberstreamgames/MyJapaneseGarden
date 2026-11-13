@@ -127,12 +127,12 @@ A Japanese study app whose chapters currently follow the Genki I textbook. There
 - Type-check, tests and build are clean. Tests cover the pure rules only.
 - Hiragana and katakana are complete.
 - Kanji: all 80 JLPT N5 kanji, in Genki lessons 3-10. Genki's N4+ Reading & Writing kanji (65 more) are not added.
-- Vocab: Genki lessons 1-3 so far, plus N5 Prep (565 words covering most of the ~670-word Waller N5 list).
+- Vocab: Genki lessons 1-6 so far, plus N5 Prep (565 words covering most of the ~670-word Waller N5 list).
 - Grammar has no content yet.
 - JLPT N5 research (lists, Genki mapping, licensing) is in `reports/JLPT N5 vocabulary grammar kanji.md`, with notes in `research_notes/`. Both are git-ignored and exist only on the maintainer's machine: never commit them.
 
 ## Known issues and planned work
 
-1. Adding Genki I vocab is paused: don't add more lesson lists until the curriculum and licensing are decided (see the licensing notes in the local `research_notes/`). Grammar content has about 45 draft items that need a native-speaker check.
+1. Genki I vocab: lessons 1-6 are in, 7-12 are still to add. The app is shared with classmates who each own Genki I, so following its lesson lists is fine. Grammar content has about 45 draft items that need a native-speaker check.
 2. `importData()`/`load()` repair the garden, weeds, streak and collection. Also check `lessons`, `xp`, `best`, and `stats`.
-3. Replace the stock Vite `README.md` and rename the package from `japanesestudyapp`.
+3. Rename the package from `japanesestudyapp`.
