@@ -65,13 +65,14 @@ interface Saved {
   best: number // best combo ever
   muted: boolean
   mode: Mode
+  kana: boolean // the player can type Japanese, so vocab sometimes asks for the word in kana
 }
 
 const KEY = 'genki-study-v1'
 
 const DECKS: Deck[] = ['hiragana', 'katakana', 'kanji', 'vocab', 'grammar']
 
-const SAVE_VERSION = 11 // 3: coins, weeds and ants. 4: streak, collection, visitors. 5: decorations. 6: tutorial. 7: 10 plots. 8: upgrades, lawn spots, garden looks. 9: creature collection. 10: spaced repetition, seed packets. 11: new cards counted per deck
+const SAVE_VERSION = 12 // 3: coins, weeds and ants. 4: streak, collection, visitors. 5: decorations. 6: tutorial. 7: 10 plots. 8: upgrades, lawn spots, garden looks. 9: creature collection. 10: spaced repetition, seed packets. 11: new cards counted per deck. 12: typing in Japanese
 
 const defaults = (): Saved => ({
   version: SAVE_VERSION,
@@ -98,6 +99,7 @@ const defaults = (): Saved => ({
   best: 0,
   muted: false,
   mode: 'mix',
+  kana: false,
 })
 
 const time = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
@@ -151,6 +153,7 @@ function repair(data: Saved): Saved {
   data.decor = normalizeDecor(data.decor, DECOR_SPOTS.length)
   data.look = normalizeLook(data.look)
   data.mode = normalizeMode(data.mode)
+  data.kana = data.kana === true
   data.stats = repairStats(data.stats)
   data.daily = repairDaily(data.daily)
   data.seedsUsed = count(data.seedsUsed)

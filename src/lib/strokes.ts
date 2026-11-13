@@ -15,8 +15,18 @@ const POINTS = 16
 
 // Thresholds in units of the character's size, after both are scaled to the same box.
 // Tuned in strokes.test.ts against jittered drawings and look-alike characters (め/ぬ, ソ/ン, シ/ツ...).
-export const STROKE_MAX = 0.19 // the worst single stroke
-export const MEAN_MAX = 0.11 // all strokes on average
+// Kept loose for real, wobbly hands: judge's check against the rest of the deck is what tells
+// look-alikes apart, so these only need to turn away scribbles.
+export const STROKE_MAX = 0.3 // the worst single stroke
+export const MEAN_MAX = 0.16 // all strokes on average
+
+// Why one stroke failed, so the card can say more than "wrong".
+export type Why = 'backwards' | 'place' | 'long' | 'short' | 'shape'
+export interface Fault {
+  stroke: number // the reference stroke (its number in the replay, from 0)
+  drawn: number // the player's stroke paired with it
+  why: Why
+}
 
 export interface Verdict {
   ok: boolean
@@ -28,6 +38,8 @@ export interface Verdict {
   drawn: number
   want: number
   costs: number[] // per reference stroke, for the dev page
+  faults?: Fault[] // reason 'shape': the strokes that failed, worst first
+  messy?: boolean // reason 'shape': no stroke stands out, the whole drawing is just too far off
 }
 
 const toPts = (flat: number[]): Pt[] => Array.from({ length: flat.length / 2 }, (_, i) => [flat[2 * i], flat[2 * i + 1]])
@@ -137,7 +149,98 @@ export function match(drawn: Pt[][], ref: CharStrokes): Verdict {
   const pick = assign(matrix)
   const costs = pick.map((j, i) => matrix[i][j])
   if (passes(costs)) return { ...base, ok: true, order: pick.some((j, i) => j !== i), costs, score: mean(costs) }
-  return { ...base, ok: false, reason: 'shape', costs: inOrder, score: mean(costs) }
+  return { ...base, ok: false, reason: 'shape', costs: inOrder, score: mean(costs), ...explain(d, r, pick) }
+}
+
+const centroid = (s: Pt[]): Pt => [mean(s.map((p) => p[0])), mean(s.map((p) => p[1]))]
+const shift = (s: Pt[], [x, y]: Pt): Pt[] => s.map((p) => [p[0] - x, p[1] - y])
+const length = (s: Pt[]) => s.slice(1).reduce((a, p, i) => a + Math.hypot(p[0] - s[i][0], p[1] - s[i][1]), 0)
+const FIXED = STROKE_MAX * 0.6 // close enough, once the one thing wrong with a stroke is undone
+
+// The scale and shift that best lay the drawn strokes over the reference (least squares), using only
+// the strokes in `use`. One stroke in the wrong place shouldn't drag the others off with it.
+function fit(d: Pt[][], r: Pt[][], use: number[]): (s: Pt[]) => Pt[] {
+  const P = use.flatMap((i) => d[i])
+  const Q = use.flatMap((i) => r[i])
+  const [pc, qc] = [centroid(P), centroid(Q)]
+  let num = 0
+  let den = 0
+  P.forEach((p, k) => {
+    num += (p[0] - pc[0]) * (Q[k][0] - qc[0]) + (p[1] - pc[1]) * (Q[k][1] - qc[1])
+    den += (p[0] - pc[0]) ** 2 + (p[1] - pc[1]) ** 2
+  })
+  // Both sides are already normalized, so the scale stays near 1. Unbounded, it could shrink a
+  // scribble to a speck that "fits" any short stroke.
+  const k = den > 1e-9 && num > 0 ? Math.min(4, Math.max(0.5, num / den)) : 1
+  return (s) => s.map(([x, y]) => [(x - pc[0]) * k + qc[0], (y - pc[1]) * k + qc[1]])
+}
+
+// Try both the order the player drew in and the cheapest pairing: a stroke far out of place can
+// pull the pairing askew (か's dot paired with its long stroke), and then nothing would fit.
+function explain(d: Pt[][], r: Pt[][], pick: number[]): { faults: Fault[]; messy: boolean } {
+  const drawnOrder = diagnose(d, r, r.map((_, i) => i))
+  if (pick.every((j, i) => j === i)) return drawnOrder
+  const paired = diagnose(d, r, pick)
+  const rank = (x: { faults: Fault[]; messy: boolean }) => (x.messy ? Infinity : x.faults.length)
+  return rank(paired) < rank(drawnOrder) ? paired : drawnOrder
+}
+
+// Name the strokes that spoil a drawing. Each round leaves out the stroke whose absence lets the rest
+// fit best, until the rest fit; needing to leave out more than a couple reads as messy.
+function diagnose(d: Pt[][], r: Pt[][], pick: number[]): { faults: Fault[]; messy: boolean } {
+  const n = r.length
+  if (n < 2) return single(d[0], r[0])
+  const mine = r.map((_, i) => d[pick[i]]) // drawn strokes in reference order
+  const limit = Math.max(1, Math.min(2, Math.floor(n / 2)))
+  const costsWith = (out: number[]) => {
+    const keep = r.map((_, i) => i).filter((i) => !out.includes(i))
+    const f = fit(mine, r, keep)
+    return { f, costs: r.map((s, i) => cost(f(mine[i]), s)) }
+  }
+  // The rest fit when they're clearly closer than the limits that failed the drawing.
+  const fits = (costs: number[], out: number[]) => {
+    const rest = costs.filter((_, i) => !out.includes(i))
+    return mean(rest) <= MEAN_MAX * 0.6 && Math.max(...rest) <= STROKE_MAX * 0.7
+  }
+  let out: number[] = []
+  let cur = costsWith(out)
+  while (!fits(cur.costs, out)) {
+    if (out.length >= limit) return { faults: [], messy: true }
+    const tries = r
+      .map((_, i) => i)
+      .filter((i) => !out.includes(i))
+      .map((i) => ({ i, t: costsWith([...out, i]) }))
+      .map((x) => ({ ...x, rest: mean(x.t.costs.filter((_, j) => j !== x.i && !out.includes(j))) }))
+    // On a near tie (二: either stroke alone fits itself), blame the one that fits worse with all in.
+    const near = (a: number, b: number) => Math.abs(a - b) < 0.01
+    const best = tries.reduce((a, b) => (near(a.rest, b.rest) ? (cur.costs[b.i] > cur.costs[a.i] ? b : a) : b.rest < a.rest ? b : a))
+    out = [...out, best.i]
+    cur = best.t
+  }
+  // A stroke only takes the blame if it's clearly off once the rest are laid over the reference.
+  if (!out.length || out.some((i) => cur.costs[i] <= FIXED)) return { faults: [], messy: true }
+  const faults = out
+    .map((i) => ({ i, c: cur.costs[i] }))
+    .sort((a, b) => b.c - a.c)
+    .map(({ i }): Fault => ({ stroke: i, drawn: pick[i], why: name(cur.f(mine[i]), r[i]) }))
+  return { faults, messy: false }
+}
+
+// A one-stroke character (し, 一) has nothing to line it up against: judge it as normalized.
+function single(t: Pt[], s: Pt[]): { faults: Fault[]; messy: boolean } {
+  return { faults: [{ stroke: 0, drawn: 0, why: name(t, s) }], messy: false }
+}
+
+// What one undone thing makes the stroke fit: its direction, its place, or its length.
+function name(t: Pt[], s: Pt[]): Why {
+  if (cost([...t].reverse(), s) <= FIXED) return 'backwards'
+  const ct = shift(t, centroid(t))
+  const cs = shift(s, centroid(s))
+  if (cost(ct, cs) <= FIXED) return 'place'
+  const lt = length(t) || 1
+  const ls = length(s) || 1
+  if (cost(ct.map(([x, y]): Pt => [(x * ls) / lt, (y * ls) / lt]), cs) <= FIXED) return lt > ls ? 'long' : 'short'
+  return 'shape'
 }
 
 const mean = (c: number[]) => c.reduce((a, b) => a + b, 0) / c.length

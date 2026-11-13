@@ -160,6 +160,7 @@
         <option value="draw">Drawing (kana and kanji)</option>
       </select>
     </label>
+    <label><input type="checkbox" bind:checked={app.kana} onchange={save} /> I can type in Japanese</label>
     <label><input type="checkbox" bind:checked={app.muted} onchange={save} /> Mute sounds</label>
     <button onclick={download}>Export progress</button>
     <label class="file">Import progress<input type="file" accept="application/json" onchange={upload} /></label>
@@ -167,6 +168,7 @@
     <button class="danger" onclick={() => (asking = 'stats')}>Reset stats</button>
     <button class="danger" onclick={() => (asking = 'garden')}>Reset garden</button>
   </div>
+  <p class="dim">With “I can type in Japanese” on, typed questions on words you've met sometimes show the English and take the word in hiragana, and harder English-to-Japanese cards can be typed too.</p>
   {#if msg}<p class="dim">{msg}</p>{/if}
 
   {#if asking === 'stats'}

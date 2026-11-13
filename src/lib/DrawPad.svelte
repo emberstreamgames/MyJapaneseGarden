@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { BOX, type CharStrokes, type Pt } from './strokes'
+  import { BOX, type CharStrokes, type Fault, type Pt } from './strokes'
 
   // A square practice sheet to draw one character on, in KanjiVG's 109-unit box so the reference can
   // be laid over it. ⤢ moves the same sheet to a full-screen layer for more room on a phone.
@@ -10,6 +10,7 @@
     show = null,
     ok = false,
     label = '',
+    faults = [],
   }: {
     strokes?: Pt[][]
     onCheck: (strokes: Pt[][]) => void
@@ -17,7 +18,11 @@
     show?: CharStrokes | null // the right strokes, played in order over the drawing
     ok?: boolean // tints the drawing as right
     label?: string // the prompt, repeated on the full-screen sheet
+    faults?: Fault[] // after a miss: the player's strokes that went wrong, and the right ones they stand for
   } = $props()
+
+  const offDrawn = $derived(new Set(faults.map((f) => f.drawn)))
+  const offRef = $derived(new Set(faults.map((f) => f.stroke)))
 
   const TAP = 1.5 // shorter than this (in box units) is a stray tap, not a stroke: real dots are longer
 
@@ -67,6 +72,16 @@
     if (!strokes.length || done) return
     full = false
     onCheck($state.snapshot(strokes) as Pt[][])
+  }
+
+  // A small arrowhead at a stroke's end, pointing the way it was drawn.
+  function arrow(s: Pt[]): string {
+    const end = s[s.length - 1]
+    const from = s.findLast((p) => Math.hypot(p[0] - end[0], p[1] - end[1]) > 4)
+    if (!from) return ''
+    const a = Math.atan2(end[1] - from[1], end[0] - from[0])
+    const pt = (r: number, t: number) => `${(end[0] + r * Math.cos(a + t)).toFixed(1)},${(end[1] + r * Math.sin(a + t)).toFixed(1)}`
+    return [pt(3, 0), pt(6, 2.5), pt(6, -2.5)].join(' ')
   }
 
   const line = (s: Pt[]) => s.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ')
@@ -119,18 +134,27 @@
       <line x1="6" y1={BOX / 2} x2={BOX - 6} y2={BOX / 2} />
     </g>
     <g class="pad-ink" class:faint={!!show} class:ok>
-      {#each strokes as s, i (i)}<polyline points={line(s)} />{/each}
+      {#each strokes as s, i (i)}<polyline points={line(s)} class:hide={!!show && offDrawn.has(i)} />{/each}
       {#if live}<polyline points={line(live)} />{/if}
     </g>
     {#if show}
       {#key replay}
         <g class="pad-answer">
           {#each show.d as d, i (i)}
-            <path {d} pathLength="1" style="--i:{i}" />
-            <text x={show.p[i][0] - 5} y={show.p[i][1] - 2} style="--i:{i}">{i + 1}</text>
+            <path {d} pathLength="1" style="--i:{i}" class:off={offRef.has(i)} />
+            <text x={show.p[i][0] - 5} y={show.p[i][1] - 2} style="--i:{i}" class:off={offRef.has(i)}>{i + 1}</text>
           {/each}
         </g>
       {/key}
+      <!-- On top of the right strokes, so one drawn backwards over its twin still shows which way it went. -->
+      <g class="pad-off">
+        {#each strokes as s, i (i)}
+          {#if offDrawn.has(i)}
+            <polyline points={line(s)} />
+            {#if arrow(s)}<polygon points={arrow(s)} />{/if}
+          {/if}
+        {/each}
+      </g>
     {/if}
   </svg>
 {/snippet}

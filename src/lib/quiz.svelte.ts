@@ -60,10 +60,43 @@ export function nearMiss(it: Item, typed: string): boolean {
   return forms.some((a) => a.length >= 4 && editDistance(a, typed) <= (a.length >= 9 ? 2 : 1))
 }
 
+// Typed Japanese passes as hiragana or katakana, in kana or as written (映画 or えいが), without the
+// affix marks of rows like ～さん or （～を）ください. Katakana words also pass in hiragana.
+const hira = (s: string) => s.replace(/[\u30a1-\u30f6]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60))
+const kanaForm = (s: string) =>
+  hira(s.normalize('NFKC').toLowerCase())
+    .replace(/\([^)]*\)/g, '')
+    .replace(/[\s～~〜・。、.!！?？]/g, '')
+
+// The word an English to Japanese card is after, in each form it's written: a harder version
+// takes its reading from the card it was made from.
+export function japaneseAnswers(it: Item): string[] {
+  const base = it.side === 'reverse' ? ITEMS.find((i) => i.id === it.base) : it
+  if (!base) return []
+  return [...base.front.split(/[／/]/), ...(base.hint ? [base.hint] : [])].map(kanaForm).filter(Boolean)
+}
+
+// A word's reading, shown with the answer when it's written in kanji (映画 is read えいが).
+export function readingOf(it: Item): string {
+  const base = it.side === 'reverse' ? ITEMS.find((i) => i.id === it.base) : it
+  return base?.type === 'vocab' ? (base.hint ?? '') : ''
+}
+
+export const acceptedJapanese = (it: Item, typed: string): boolean => japaneseAnswers(it).includes(kanaForm(typed))
+
+// One kana off on a word of four or more: a slip, not a different word.
+const nearMissJapanese = (it: Item, typed: string): boolean =>
+  japaneseAnswers(it).some((a) => [...a].length >= 4 && editDistance(a, kanaForm(typed)) <= 1)
+
+// With the player able to type Japanese, this share of typed questions on vocab they've met
+// turns around: the English is shown and the word is typed.
+export const FLIP_CHANCE = 0.5
+
 // The question/answer engine shared by free practice and the garden quizzes.
 export class Quiz {
   current = $state<Item | null>(null)
   kind = $state<Kind>('choice')
+  flipped = $state(false) // a vocab card asked English to Japanese this time
   options = $state<string[]>([])
   typed = $state('')
   result = $state<null | 'right' | 'wrong'>(null)
@@ -190,11 +223,14 @@ export class Quiz {
     this.verdict = null
     this.ink = []
     this.isNew = !app.stats[pick.id]
-    // Japanese can't be typed on every keyboard, so harder versions are always multiple choice.
+    // Japanese can't be typed on every keyboard, so harder versions are multiple choice unless the
+    // player says they can (app.kana); then an English to Japanese one may be typed too.
     // Drawing needs the character met once: a first meeting can't be recalled by hand.
     const draw = this.draws() && !this.isNew && canDraw(pick) && !!strokesFor(pick.front)
     const kinds: Kind[] = pick.side
-      ? ['choice']
+      ? pick.side === 'reverse' && app.kana && app.mode !== 'choice'
+        ? app.mode === 'type' ? ['type'] : ['choice', 'type']
+        : ['choice']
       : app.mode === 'draw' && draw
         ? ['draw']
         : app.mode === 'mix' || app.mode === 'draw'
@@ -206,6 +242,13 @@ export class Quiz {
       // Too few distinct answers to make a real choice: ask for a typed answer instead.
       if (this.options.length < 2 && !pick.side) this.kind = 'type'
     }
+    // A word can't be produced before it's been met, so only known vocab turns around.
+    this.flipped = this.kind === 'type' && app.kana && pick.type === 'vocab' && !pick.side && !this.isNew && Math.random() < FLIP_CHANCE
+  }
+
+  // The typed answer is Japanese: a turned-around card, or a harder English to Japanese one.
+  get typesJapanese(): boolean {
+    return this.kind === 'type' && (this.flipped || this.current?.side === 'reverse')
   }
 
   private makeOptions(it: Item) {
@@ -299,8 +342,9 @@ export class Quiz {
     if (!this.current || this.result) return
     const t = this.typed.trim().toLowerCase()
     if (!t) return
-    const ok = accepted(this.current, t)
-    this.near = !ok && nearMiss(this.current, t)
+    const ja = this.typesJapanese
+    const ok = ja ? acceptedJapanese(this.current, t) : accepted(this.current, t)
+    this.near = !ok && (ja ? nearMissJapanese(this.current, t) : nearMiss(this.current, t))
     this.answer(ok)
   }
 
